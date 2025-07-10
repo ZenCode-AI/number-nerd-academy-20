@@ -29,12 +29,58 @@ export const testSetReducer = (state: TestSetState, action: TestSetAction): Test
       };
 
     case 'COMPLETE_MODULE':
+      const newSkippedModules = [...(state.session?.skippedModules || [])];
+      
+      // Calculate which modules should be skipped based on adaptive rules
+      if (state.testSet?.adaptiveConfig.enabled && state.testSet.adaptiveConfig.rules.length > 0) {
+        const applicableRules = state.testSet.adaptiveConfig.rules.filter(
+          rule => rule.fromModule === action.payload.moduleNumber
+        );
+        
+        if (applicableRules.length > 0) {
+          const rule = applicableRules[0];
+          const percentage = action.payload.percentage;
+          const meetsThreshold = percentage >= rule.scoreThreshold;
+          
+          console.log('🔄 Adaptive rule evaluation:', {
+            moduleNumber: action.payload.moduleNumber,
+            score: percentage,
+            threshold: rule.scoreThreshold,
+            meetsThreshold,
+            fromModule: rule.fromModule,
+            toModule: rule.toModule
+          });
+          
+          if (meetsThreshold) {
+            // Skip modules between current and target
+            const currentModule = action.payload.moduleNumber;
+            const targetModule = rule.toModule;
+            
+            for (let i = currentModule + 1; i < targetModule; i++) {
+              if (!newSkippedModules.includes(i)) {
+                newSkippedModules.push(i);
+                console.log('⏭️ Skipping module:', i);
+              }
+            }
+          } else if (rule.skipModules) {
+            // Add any modules specified in skipModules
+            rule.skipModules.forEach(moduleNum => {
+              if (!newSkippedModules.includes(moduleNum)) {
+                newSkippedModules.push(moduleNum);
+                console.log('⏭️ Skipping module (rule-based):', moduleNum);
+              }
+            });
+          }
+        }
+      }
+      
       return {
         ...state,
         moduleResults: [...state.moduleResults, action.payload],
         session: state.session ? {
           ...state.session,
-          moduleResults: [...state.session.moduleResults, action.payload]
+          moduleResults: [...state.session.moduleResults, action.payload],
+          skippedModules: newSkippedModules
         } : null
       };
 

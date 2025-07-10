@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { TestSetContextType, TestSetState } from './TestSetContext/types';
 import { testSetReducer } from './TestSetContext/reducer';
@@ -41,11 +40,19 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
       currentModuleNumber, 
       adaptiveEnabled: state.testSet?.adaptiveConfig.enabled, 
       hasResult: !!lastResult,
-      availableRules: state.testSet?.adaptiveConfig.rules.length || 0
+      availableRules: state.testSet?.adaptiveConfig.rules.length || 0,
+      skippedModules: state.session?.skippedModules || []
     });
     
     if (!state.testSet?.adaptiveConfig.enabled || !lastResult) {
-      const nextModule = currentModuleNumber + 1;
+      let nextModule = currentModuleNumber + 1;
+      
+      // Skip any modules that are in the skipped list
+      while (state.session?.skippedModules.includes(nextModule) && nextModule <= (state.testSet?.modules.length || 0)) {
+        console.log('⏭️ Skipping module:', nextModule, '(in skipped list)');
+        nextModule++;
+      }
+      
       console.log('➡️ Non-adaptive progression:', currentModuleNumber, '→', nextModule);
       return nextModule;
     }
@@ -68,18 +75,13 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
         nextModule = rule.toModule;
         console.log('✅ Score threshold met:', percentage, '>=', rule.scoreThreshold, ', jumping to module:', nextModule);
       } else {
-        // Check if rule has skip modules logic
-        if (rule.skipModules && rule.skipModules.length > 0) {
-          nextModule = currentModuleNumber + 1;
-          // Skip modules that are in the skip list
-          while (rule.skipModules.includes(nextModule) && nextModule <= (state.testSet?.modules.length || 0)) {
-            nextModule++;
-          }
-          console.log('⏭️ Score threshold not met, skipping to module:', nextModule);
-        } else {
-          nextModule = currentModuleNumber + 1;
-          console.log('➡️ Score threshold not met, proceeding to next module:', nextModule);
+        // Go to next sequential module, but skip any that should be skipped
+        nextModule = currentModuleNumber + 1;
+        while (state.session?.skippedModules.includes(nextModule) && nextModule <= (state.testSet?.modules.length || 0)) {
+          console.log('⏭️ Skipping module:', nextModule, '(threshold not met)');
+          nextModule++;
         }
+        console.log('➡️ Score threshold not met, proceeding to module:', nextModule);
       }
       
       console.log('🔄 Adaptive rule applied:', { 
@@ -93,10 +95,17 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
       return nextModule;
     }
 
-    const defaultNext = currentModuleNumber + 1;
+    let defaultNext = currentModuleNumber + 1;
+    
+    // Skip any modules that are in the skipped list
+    while (state.session?.skippedModules.includes(defaultNext) && defaultNext <= (state.testSet?.modules.length || 0)) {
+      console.log('⏭️ Skipping module:', defaultNext, '(in skipped list)');
+      defaultNext++;
+    }
+    
     console.log('➡️ No adaptive rules, default progression:', currentModuleNumber, '→', defaultNext);
     return defaultNext;
-  }, [state.testSet]);
+  }, [state.testSet, state.session]);
 
   const getNextModuleDifficulty = useCallback((moduleNumber: number, previousScore: number): 'Easy' | 'Medium' | 'Hard' => {
     if (!state.testSet?.adaptiveConfig.enabled) {
@@ -149,22 +158,26 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
     
     completeModule: useCallback((result) => {
       console.log('✅ TestSetContext: completeModule called for module:', result.moduleNumber);
-      console.log('🔍 Current state before completion:');
-      console.log('  - currentModule:', state.currentModule);
-      console.log('  - testSet modules:', state.testSet?.modules.length);
-      console.log('  - moduleResults length:', state.moduleResults.length);
-      console.log('  - result module number:', result.moduleNumber);
+      console.log('🔍 Current state before completion:', {
+        currentModule: state.currentModule,
+        testSetModules: state.testSet?.modules.length,
+        moduleResultsLength: state.moduleResults.length,
+        resultModuleNumber: result.moduleNumber,
+        adaptiveEnabled: state.testSet?.adaptiveConfig.enabled
+      });
       
       dispatch({ type: 'COMPLETE_MODULE', payload: result });
       
-      // Check if this would be the last module
+      // Check if this would be the last module after adaptive skipping
       const nextModuleNumber = getNextModuleNumber(result.moduleNumber, result);
       const totalModules = state.testSet?.modules.length || 0;
       
-      console.log('📊 Module completion analysis:');
-      console.log('  - next module would be:', nextModuleNumber);
-      console.log('  - total modules:', totalModules);
-      console.log('  - is last module:', nextModuleNumber > totalModules);
+      console.log('📊 Module completion analysis:', {
+        nextModule: nextModuleNumber,
+        totalModules,
+        isLastModule: nextModuleNumber > totalModules,
+        skippedModules: state.session?.skippedModules || []
+      });
       
       if (nextModuleNumber > totalModules) {
         console.log('🏁 TestSetContext: All modules completed (including adaptive skipping)');
@@ -174,7 +187,7 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
       } else {
         console.log('📚 TestSetContext: More modules remaining, will continue or start break');
       }
-    }, [state.currentModule, state.testSet, state.moduleResults, getNextModuleNumber]),
+    }, [state.currentModule, state.testSet, state.moduleResults, state.session, getNextModuleNumber]),
     
     startBreak: useCallback((duration = 300) => {
       console.log('☕ TestSetContext: Starting break for:', Math.round(duration / 60), 'minutes (', duration, 'seconds)');
@@ -190,12 +203,14 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
     
     proceedToNextModule: useCallback(() => {
       console.log('🔄 TestSetContext: proceedToNextModule called');
-      console.log('🔍 Current state:');
-      console.log('  - currentModule:', state.currentModule);
-      console.log('  - testSet modules:', state.testSet?.modules.length);
-      console.log('  - isOnBreak:', state.isOnBreak);
-      console.log('  - hasOriginalTestData:', !!originalTestData);
-      console.log('  - hasAdminTestData:', !!adminTestData);
+      console.log('🔍 Current state:', {
+        currentModule: state.currentModule,
+        testSetModules: state.testSet?.modules.length,
+        isOnBreak: state.isOnBreak,
+        hasOriginalTestData: !!originalTestData,
+        hasAdminTestData: !!adminTestData,
+        skippedModules: state.session?.skippedModules || []
+      });
       
       if (!state.testSet || !originalTestData) {
         console.error('❌ TestSetContext: Cannot proceed - missing testSet or originalTestData');
@@ -228,7 +243,7 @@ export const TestSetProvider = ({ children }: { children: React.ReactNode }) => 
       });
       
       console.log('✅ TestSetContext: proceedToNextModule dispatch completed');
-    }, [state.testSet, state.currentModule, state.isOnBreak, state.moduleResults, originalTestData, adminTestData, getNextModuleNumber]),
+    }, [state.testSet, state.currentModule, state.isOnBreak, state.moduleResults, state.session, originalTestData, adminTestData, getNextModuleNumber]),
     
     completeTestSet: useCallback(() => {
       console.log('🎉 TestSetContext: Completing entire test set');
