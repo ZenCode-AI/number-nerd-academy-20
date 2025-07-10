@@ -38,7 +38,8 @@ export const getModuleData = (testSet: TestSet, moduleNumber: number, originalDa
           correctAnswer: q.correctAnswer,
           explanation: q.explanation,
           points: q.points,
-          imageUrl: q.imageUrl
+          imageUrl: q.imageUrl,
+          difficulty: adminModule.difficulty // Add the missing difficulty property
         })),
         totalPoints: adminModule.questions.reduce((sum, q) => sum + (q.points || 1), 0),
         instructions: `Complete all questions in ${adminModule.name}. You have ${Math.ceil(adminTest.totalDuration / adminTest.modules.length)} minutes.`,
@@ -90,7 +91,8 @@ const generateMockQuestions = (subject: 'Math' | 'English', difficulty: 'Easy' |
         options: ['x = 4', 'x = 6', 'x = 8', 'x = 10'],
         correctAnswer: '0', // Index-based: first option is correct
         explanation: 'Subtract 5 from both sides: 2x = 8, then divide by 2: x = 4',
-        points: 1
+        points: 1,
+        difficulty: difficulty
       });
     } else {
       questions.push({
@@ -100,7 +102,8 @@ const generateMockQuestions = (subject: 'Math' | 'English', difficulty: 'Easy' |
         options: ['Their going to the store', 'There going to the store', "They're going to the store", 'Theyre going to the store'],
         correctAnswer: '2', // Index-based: third option is correct
         explanation: "They're is the contraction for 'they are'",
-        points: 1
+        points: 1,
+        difficulty: difficulty
       });
     }
   }
