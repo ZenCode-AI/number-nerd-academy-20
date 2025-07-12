@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { TestQuestion } from '@/types/test';
 import QuestionNavigation from '../core/QuestionNavigation';
 
@@ -36,10 +37,24 @@ const ParagraphQuestion = ({
 }: ParagraphQuestionProps) => {
   const currentAnswer = typeof answer === 'string' ? answer : '';
   const [textAnswer, setTextAnswer] = useState(currentAnswer);
+  const [selectedOption, setSelectedOption] = useState<number | null>(
+    question.options && typeof answer === 'number' ? answer : null
+  );
 
-  const handleAnswerChange = (value: string) => {
-    setTextAnswer(value);
-    onAnswerChange?.(value);
+  const hasOptions = question.options && question.options.length > 0;
+
+  const handleAnswerChange = (value: string | number) => {
+    if (hasOptions && typeof value === 'number') {
+      setSelectedOption(value);
+      onAnswerChange?.(value);
+    } else if (!hasOptions && typeof value === 'string') {
+      setTextAnswer(value);
+      onAnswerChange?.(value);
+    }
+  };
+
+  const handleOptionSelect = (optionIndex: number) => {
+    handleAnswerChange(optionIndex);
   };
 
   return (
@@ -66,19 +81,59 @@ const ParagraphQuestion = ({
               </Card>
             )}
           </div>
+          
           {/* Right: Answer Input */}
           <div className="flex flex-col space-y-6 overflow-auto pl-4 border-l border-gray-200">
-            <h4 className="text-base font-medium text-gray-900">Write your answer:</h4>
-            <Card>
-              <CardContent className="p-4">
-                <Textarea
-                  value={textAnswer}
-                  onChange={(e) => handleAnswerChange(e.target.value)}
-                  placeholder="Write your detailed answer here..."
-                  className="min-h-[200px] text-base"
-                />
-              </CardContent>
-            </Card>
+            {hasOptions ? (
+              /* Multiple Choice Options */
+              <>
+                <h4 className="text-base font-medium text-gray-900">Select your answer:</h4>
+                <Card>
+                  <CardContent className="p-4 space-y-3">
+                    {question.options?.map((option, index) => (
+                      <Button
+                        key={index}
+                        variant={selectedOption === index ? "default" : "outline"}
+                        className={`w-full text-left justify-start h-auto p-4 whitespace-normal ${
+                          selectedOption === index 
+                            ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                        onClick={() => handleOptionSelect(index)}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${
+                            selectedOption === index 
+                              ? 'bg-white border-white' 
+                              : 'border-gray-300'
+                          }`}>
+                            {selectedOption === index && (
+                              <div className="w-2 h-2 bg-blue-600 rounded-full m-0.5"></div>
+                            )}
+                          </div>
+                          <span className="text-sm">{option}</span>
+                        </div>
+                      </Button>
+                    ))}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              /* Free Text Input */
+              <>
+                <h4 className="text-base font-medium text-gray-900">Write your answer:</h4>
+                <Card>
+                  <CardContent className="p-4">
+                    <Textarea
+                      value={textAnswer}
+                      onChange={(e) => handleAnswerChange(e.target.value)}
+                      placeholder="Write your detailed answer here..."
+                      className="min-h-[200px] text-base"
+                    />
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         </div>
       </CardContent>

@@ -4,11 +4,21 @@ export const validateAnswer = (userAnswer: string | string[] | number, correctAn
   const userStr = String(userAnswer).toLowerCase().trim();
   const correctStr = String(correctAnswer).toLowerCase().trim();
   
+  console.log('Validating answer:', {
+    userAnswer,
+    correctAnswer,
+    questionType,
+    options,
+    userStr,
+    correctStr
+  });
+  
   switch (questionType) {
     case 'Numeric':
       const userNum = parseFloat(userStr);
       const correctNum = parseFloat(correctStr);
       return !isNaN(userNum) && !isNaN(correctNum) && Math.abs(userNum - correctNum) < 0.001;
+      
     case 'MCQ':
     case 'Image':
       // Handle both index-based and text-based correct answers
@@ -45,16 +55,31 @@ export const validateAnswer = (userAnswer: string | string[] | number, correctAn
         }
       }
       return userStr === correctStr;
+      
     case 'Paragraph':
-      // For paragraph questions, handle index-based answers if options exist
+      // For paragraph questions, handle both options-based and free-text
       if (options && options.length > 0) {
+        // If it has options, treat it like MCQ
+        const userIndex = parseInt(userStr);
         const correctIndex = parseInt(correctStr);
-        if (!isNaN(correctIndex) && correctIndex >= 0 && correctIndex < options.length) {
-          const actualCorrectAnswer = options[correctIndex].toLowerCase().trim();
-          return userStr.includes(actualCorrectAnswer) || actualCorrectAnswer.includes(userStr);
+        
+        if (!isNaN(userIndex) && !isNaN(correctIndex)) {
+          return userIndex === correctIndex;
         }
+        
+        // Also check if the user answer matches any option text
+        const userOption = options.find(opt => opt.toLowerCase().trim() === userStr);
+        if (userOption) {
+          const userOptionIndex = options.indexOf(userOption);
+          return userOptionIndex === correctIndex;
+        }
+        
+        return false;
+      } else {
+        // Free-text paragraph question - use flexible matching
+        return userStr.includes(correctStr) || correctStr.includes(userStr);
       }
-      return userStr.includes(correctStr) || correctStr.includes(userStr);
+      
     default:
       return userStr === correctStr;
   }
@@ -74,7 +99,7 @@ export const calculateModuleScore = (questions: any[], answers: any[]) => {
     
     maxScore += questionPoints;
     
-    if (userAnswer && userAnswer.answer) {
+    if (userAnswer && userAnswer.answer !== undefined && userAnswer.answer !== '') {
       const isCorrect = validateAnswer(userAnswer.answer, question.correctAnswer, question.type, question.options);
       console.log(`Question ${index + 1}:`, {
         type: question.type,
@@ -96,6 +121,6 @@ export const calculateModuleScore = (questions: any[], answers: any[]) => {
     maxScore,
     questionsCorrect,
     questionsIncorrect: questions.length - questionsCorrect,
-    questionsSkipped: questions.length - answers.length
+    questionsSkipped: questions.length - answers.filter(a => a.answer !== undefined && a.answer !== '').length
   };
 };

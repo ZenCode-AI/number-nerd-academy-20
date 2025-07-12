@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight, Home, CheckCircle, XCircle, Flag } from 'lucide-react';
+import { validateAnswer } from '@/components/test-taking/core/utils/testScoring';
 
 interface ReviewData {
   questions: any[];
@@ -24,8 +25,8 @@ const TestReview = () => {
     if (storedReviewData) {
       setReviewData(JSON.parse(storedReviewData));
     } else {
-      // Fallback to browse page if no review data
-      navigate('/student/browse');
+      // Fallback to dashboard instead of browse page
+      navigate('/student');
     }
   }, [navigate]);
 
@@ -44,7 +45,9 @@ const TestReview = () => {
   const userAnswer = reviewData.userAnswers.find(a => a.questionIndex === currentQuestion);
   const isFlagged = reviewData.flaggedQuestions.includes(currentQuestion);
   
-  const isCorrect = userAnswer && userAnswer.answer === question?.correctAnswer;
+  // Use the proper validateAnswer function for accurate comparison
+  const isCorrect = userAnswer && userAnswer.answer ? 
+    validateAnswer(userAnswer.answer, question?.correctAnswer, question?.type, question?.options) : false;
   const hasAnswer = userAnswer && userAnswer.answer;
 
   const handlePrevious = () => {
@@ -75,6 +78,30 @@ const TestReview = () => {
 
   const answerStatus = getAnswerStatus();
 
+  // Helper function to get correct answer display
+  const getCorrectAnswerDisplay = () => {
+    if (question?.type === 'MCQ' && question?.options) {
+      const correctIndex = parseInt(question.correctAnswer);
+      if (!isNaN(correctIndex) && correctIndex >= 0 && correctIndex < question.options.length) {
+        return question.options[correctIndex];
+      }
+    }
+    return question?.correctAnswer || 'N/A';
+  };
+
+  // Helper function to get user answer display
+  const getUserAnswerDisplay = () => {
+    if (!hasAnswer) return 'Not answered';
+    
+    if (question?.type === 'MCQ' && question?.options) {
+      const userIndex = parseInt(String(userAnswer.answer));
+      if (!isNaN(userIndex) && userIndex >= 0 && userIndex < question.options.length) {
+        return question.options[userIndex];
+      }
+    }
+    return userAnswer.answer;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-4">
       {/* Compact Header */}
@@ -104,7 +131,7 @@ const TestReview = () => {
                 className="flex items-center gap-1 text-xs"
               >
                 <Home className="h-3 w-3" />
-                Home
+                Dashboard
               </Button>
             </div>
           </div>
@@ -165,27 +192,38 @@ const TestReview = () => {
                 </div>
               )}
               
-              {question?.type === 'MCQ' && question?.options && (
+              {/* Display options for both MCQ and Paragraph questions */}
+              {(question?.type === 'MCQ' || question?.type === 'Paragraph') && question?.options && (
                 <div className="space-y-1 mt-2">
                   <p className="font-medium text-gray-700 text-xs">Options:</p>
-                  {question.options.map((option: string, index: number) => (
-                    <div 
-                      key={index}
-                      className={`p-2 rounded-lg border text-xs ${
-                        option === question.correctAnswer 
-                          ? 'bg-green-50 border-green-200 text-green-800' 
-                          : option === userAnswer?.answer 
-                            ? 'bg-red-50 border-red-200 text-red-800'
-                            : 'bg-gray-50 border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {option === question.correctAnswer && <CheckCircle className="h-3 w-3 text-green-600" />}
-                        {option === userAnswer?.answer && option !== question.correctAnswer && <XCircle className="h-3 w-3 text-red-600" />}
-                        <span>{option}</span>
+                  {question.options.map((option: string, index: number) => {
+                    const isCorrectOption = question.type === 'MCQ' ? 
+                      (parseInt(question.correctAnswer) === index || question.correctAnswer === option) :
+                      (question.correctAnswer && (question.correctAnswer.toLowerCase().includes(option.toLowerCase()) || option.toLowerCase().includes(question.correctAnswer.toLowerCase())));
+                    
+                    const isUserOption = question.type === 'MCQ' ?
+                      (parseInt(String(userAnswer?.answer)) === index || userAnswer?.answer === option) :
+                      (userAnswer?.answer && (String(userAnswer.answer).toLowerCase().includes(option.toLowerCase()) || option.toLowerCase().includes(String(userAnswer.answer).toLowerCase())));
+
+                    return (
+                      <div 
+                        key={index}
+                        className={`p-2 rounded-lg border text-xs ${
+                          isCorrectOption 
+                            ? 'bg-green-50 border-green-200 text-green-800' 
+                            : isUserOption && !isCorrectOption
+                              ? 'bg-red-50 border-red-200 text-red-800'
+                              : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {isCorrectOption && <CheckCircle className="h-3 w-3 text-green-600" />}
+                          {isUserOption && !isCorrectOption && <XCircle className="h-3 w-3 text-red-600" />}
+                          <span>{option}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -207,7 +245,7 @@ const TestReview = () => {
                       ? 'bg-green-50 border border-green-200 text-green-800'
                       : 'bg-red-50 border border-red-200 text-red-800'
                 }`}>
-                  {hasAnswer ? userAnswer.answer : 'Not answered'}
+                  {getUserAnswerDisplay()}
                 </div>
               </div>
 
@@ -215,7 +253,7 @@ const TestReview = () => {
               <div className="space-y-1">
                 <p className="font-medium text-gray-700 text-xs">Correct Answer:</p>
                 <div className="p-2 bg-green-50 border border-green-200 rounded-lg text-green-800 text-xs">
-                  {question?.correctAnswer || 'N/A'}
+                  {getCorrectAnswerDisplay()}
                 </div>
               </div>
 
