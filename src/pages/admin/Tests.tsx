@@ -64,9 +64,9 @@ const Tests = () => {
     let matchesModule = true;
     if (moduleFilter && moduleFilter !== 'all') {
       if (moduleFilter === 'modular') {
-        matchesModule = test.isModular === true;
+        matchesModule = Boolean(test.isModular);
       } else if (moduleFilter === 'single') {
-        matchesModule = !test.isModular || test.isModular === false;
+        matchesModule = !Boolean(test.isModular);
       }
     }
     
