@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -53,14 +54,23 @@ const Tests = () => {
 
   // Apply filters
   const filteredTests = tests.filter(test => {
-    return (
-      test.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (subjectFilter === '' || subjectFilter === 'all' || test.subject === subjectFilter) &&
-      (difficultyFilter === '' || difficultyFilter === 'all' || test.difficulty === difficultyFilter) &&
-      (moduleFilter === '' || moduleFilter === 'all') &&
-      (planFilter === '' || planFilter === 'all' || test.plan === planFilter) &&
-      (statusFilter === '' || statusFilter === 'all' || test.status === statusFilter)
-    );
+    const matchesSearch = test.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSubject = subjectFilter === '' || subjectFilter === 'all' || test.subject === subjectFilter;
+    const matchesDifficulty = difficultyFilter === '' || difficultyFilter === 'all' || test.difficulty === difficultyFilter;
+    const matchesPlan = planFilter === '' || planFilter === 'all' || test.plan === planFilter;
+    const matchesStatus = statusFilter === '' || statusFilter === 'all' || test.status === statusFilter;
+    
+    // Module filter logic
+    let matchesModule = true;
+    if (moduleFilter && moduleFilter !== 'all') {
+      if (moduleFilter === 'modular') {
+        matchesModule = test.isModular === true;
+      } else if (moduleFilter === 'single') {
+        matchesModule = !test.isModular || test.isModular === false;
+      }
+    }
+    
+    return matchesSearch && matchesSubject && matchesDifficulty && matchesModule && matchesPlan && matchesStatus;
   });
 
   const clearFilters = () => {

@@ -89,14 +89,13 @@ const TestFilters = ({
           </Select>
 
           <Select value={moduleFilter || 'all'} onValueChange={onModuleFilterChange}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="Module" />
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Module Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Modules</SelectItem>
-              <SelectItem value="1">Module 1</SelectItem>
-              <SelectItem value="2">Module 2</SelectItem>
-              <SelectItem value="3">Module 3</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="modular">Modular Tests</SelectItem>
+              <SelectItem value="single">Single Tests</SelectItem>
             </SelectContent>
           </Select>
 
@@ -147,7 +146,7 @@ const TestFilters = ({
             )}
             {moduleFilter && moduleFilter !== 'all' && (
               <Badge variant="secondary" className="text-xs">
-                Module: {moduleFilter}
+                Type: {moduleFilter === 'modular' ? 'Modular Tests' : 'Single Tests'}
               </Badge>
             )}
             {planFilter && planFilter !== 'all' && (
