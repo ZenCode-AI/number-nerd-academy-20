@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,13 +35,27 @@ const ParagraphQuestion = ({
   isFlagged = false,
   totalQuestions = 0
 }: ParagraphQuestionProps) => {
-  const currentAnswer = typeof answer === 'string' ? answer : '';
-  const [textAnswer, setTextAnswer] = useState(currentAnswer);
-  const [selectedOption, setSelectedOption] = useState<number | null>(
-    question.options && typeof answer === 'number' ? answer : null
-  );
-
   const hasOptions = question.options && question.options.length > 0;
+  
+  // Initialize states based on question type and existing answer
+  const [textAnswer, setTextAnswer] = useState(() => {
+    if (hasOptions) return '';
+    return typeof answer === 'string' ? answer : '';
+  });
+  
+  const [selectedOption, setSelectedOption] = useState<number | null>(() => {
+    if (!hasOptions) return null;
+    return typeof answer === 'number' ? answer : null;
+  });
+
+  // Sync state when answer prop changes
+  React.useEffect(() => {
+    if (hasOptions && typeof answer === 'number') {
+      setSelectedOption(answer);
+    } else if (!hasOptions && typeof answer === 'string') {
+      setTextAnswer(answer);
+    }
+  }, [answer, hasOptions]);
 
   const handleAnswerChange = (value: string | number) => {
     if (hasOptions && typeof value === 'number') {
