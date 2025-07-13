@@ -21,39 +21,36 @@ export const validateAnswer = (userAnswer: string | string[] | number, correctAn
       
     case 'MCQ':
     case 'Image':
-      // Handle both index-based and text-based correct answers
-      if (options && options.length > 0) {
-        // Check if userAnswer is an index (0, 1, 2, 3) or option number (1, 2, 3, 4)
-        const userIndex = parseInt(userStr);
-        const correctIndex = parseInt(correctStr);
+      // MCQ answers are now stored as 0-based indices
+      const userIndex = typeof userAnswer === 'number' ? userAnswer : parseInt(String(userAnswer));
+      const correctIndex = parseInt(correctStr);
+      
+      console.log('MCQ validation:', {
+        userAnswer,
+        userIndex,
+        correctAnswer,
+        correctIndex,
+        options
+      });
+      
+      // Both should be valid indices
+      if (!isNaN(userIndex) && !isNaN(correctIndex)) {
+        // Admin stores 1-based indices, user stores 0-based indices
+        // Convert admin's 1-based to 0-based for comparison
+        const normalizedCorrectIndex = correctIndex > 0 && correctIndex <= (options?.length || 0) ? 
+          correctIndex - 1 : correctIndex;
         
-        // If both are valid indices, compare directly
-        if (!isNaN(userIndex) && !isNaN(correctIndex)) {
-          // Handle both 0-based and 1-based indexing
-          const normalizedUserIndex = userIndex >= options.length ? userIndex - 1 : userIndex;
-          const normalizedCorrectIndex = correctIndex >= options.length ? correctIndex - 1 : correctIndex;
-          
-          console.log('Index-based comparison:', {
-            userIndex,
-            correctIndex,
-            normalizedUserIndex,
-            normalizedCorrectIndex,
-            match: normalizedUserIndex === normalizedCorrectIndex
-          });
-          
-          return normalizedUserIndex === normalizedCorrectIndex;
-        }
+        console.log('Index comparison:', {
+          userIndex,
+          correctIndex,
+          normalizedCorrectIndex,
+          match: userIndex === normalizedCorrectIndex
+        });
         
-        // If correctAnswer is a number (index), convert it to the actual option text
-        if (!isNaN(correctIndex) && correctIndex >= 0 && correctIndex < options.length) {
-          // correctAnswer is an index, compare with the option at that index
-          const actualCorrectAnswer = options[correctIndex].toLowerCase().trim();
-          return userStr === actualCorrectAnswer;
-        } else {
-          // correctAnswer is already the text, compare directly
-          return userStr === correctStr;
-        }
+        return userIndex === normalizedCorrectIndex;
       }
+      
+      // Fallback to text comparison if indices don't work
       return userStr === correctStr;
       
     case 'Paragraph':

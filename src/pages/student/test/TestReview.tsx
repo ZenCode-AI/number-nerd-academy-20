@@ -82,8 +82,12 @@ const TestReview = () => {
   const getCorrectAnswerDisplay = () => {
     if (question?.type === 'MCQ' && question?.options) {
       const correctIndex = parseInt(question.correctAnswer);
-      if (!isNaN(correctIndex) && correctIndex >= 0 && correctIndex < question.options.length) {
-        return question.options[correctIndex];
+      // Admin stores 1-based indices, convert to 0-based for display
+      const displayIndex = correctIndex > 0 && correctIndex <= question.options.length ? 
+        correctIndex - 1 : correctIndex;
+      
+      if (!isNaN(displayIndex) && displayIndex >= 0 && displayIndex < question.options.length) {
+        return question.options[displayIndex];
       }
     }
     return question?.correctAnswer || 'N/A';
@@ -94,7 +98,8 @@ const TestReview = () => {
     if (!hasAnswer) return 'Not answered';
     
     if (question?.type === 'MCQ' && question?.options) {
-      const userIndex = parseInt(String(userAnswer.answer));
+      // User answer is already 0-based index
+      const userIndex = typeof userAnswer.answer === 'number' ? userAnswer.answer : parseInt(String(userAnswer.answer));
       if (!isNaN(userIndex) && userIndex >= 0 && userIndex < question.options.length) {
         return question.options[userIndex];
       }
@@ -198,11 +203,13 @@ const TestReview = () => {
                   <p className="font-medium text-gray-700 text-xs">Options:</p>
                   {question.options.map((option: string, index: number) => {
                     const isCorrectOption = question.type === 'MCQ' ? 
-                      (parseInt(question.correctAnswer) === index || question.correctAnswer === option) :
+                      // Admin stores 1-based indices, convert to 0-based for comparison
+                      (parseInt(question.correctAnswer) - 1 === index) :
                       (question.correctAnswer && (question.correctAnswer.toLowerCase().includes(option.toLowerCase()) || option.toLowerCase().includes(question.correctAnswer.toLowerCase())));
                     
                     const isUserOption = question.type === 'MCQ' ?
-                      (parseInt(String(userAnswer?.answer)) === index || userAnswer?.answer === option) :
+                      // User answer is already 0-based index
+                      (typeof userAnswer?.answer === 'number' ? userAnswer.answer === index : parseInt(String(userAnswer?.answer)) === index) :
                       (userAnswer?.answer && (String(userAnswer.answer).toLowerCase().includes(option.toLowerCase()) || option.toLowerCase().includes(String(userAnswer.answer).toLowerCase())));
 
                     return (

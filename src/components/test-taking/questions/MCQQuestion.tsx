@@ -33,12 +33,18 @@ const MCQQuestion = ({
   isFlagged = false,
   totalQuestions = 0
 }: MCQQuestionProps) => {
-  const currentAnswer = typeof answer === 'string' ? answer : '';
-  const [selectedOption, setSelectedOption] = useState(currentAnswer);
+  // For MCQ, we store the option index (0-based), not the option text
+  const currentAnswerIndex = typeof answer === 'number' ? answer : 
+    (typeof answer === 'string' && question.options ? 
+      question.options.findIndex(opt => opt === answer) : -1);
+  
+  const [selectedOption, setSelectedOption] = useState<number>(
+    currentAnswerIndex >= 0 ? currentAnswerIndex : -1
+  );
 
-  const handleOptionSelect = (option: string) => {
-    setSelectedOption(option);
-    onAnswerChange?.(option);
+  const handleOptionSelect = (optionIndex: number) => {
+    setSelectedOption(optionIndex);
+    onAnswerChange?.(optionIndex);
   };
 
   return (
@@ -73,25 +79,25 @@ const MCQQuestion = ({
                 <Card 
                   key={index}
                   className={`cursor-pointer transition-all duration-200 ${
-                    selectedOption === option 
+                    selectedOption === index 
                       ? 'border-blue-500 bg-blue-50 shadow-md' 
                       : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                   }`}
-                  onClick={() => handleOptionSelect(option)}
+                  onClick={() => handleOptionSelect(index)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center space-x-3">
                       <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        selectedOption === option 
+                        selectedOption === index 
                           ? 'border-blue-500 bg-blue-500' 
                           : 'border-gray-300'
                       }`}>
-                        {selectedOption === option && (
+                        {selectedOption === index && (
                           <div className="w-2 h-2 rounded-full bg-white"></div>
                         )}
                       </div>
                       <span className={`flex-1 ${
-                        selectedOption === option ? 'text-blue-900 font-medium' : 'text-gray-700'
+                        selectedOption === index ? 'text-blue-900 font-medium' : 'text-gray-700'
                       }`}>
                         {option}
                       </span>
