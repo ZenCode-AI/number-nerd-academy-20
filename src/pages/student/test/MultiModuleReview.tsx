@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, Home, CheckCircle, XCircle, Flag, Clock, Target, BarChart3 } from 'lucide-react';
+import { validateAnswer } from '@/components/test-taking/core/utils/testScoring';
 
 interface ModuleReviewData {
   moduleNumber: number;
@@ -59,7 +60,7 @@ const MultiModuleReview = () => {
             testName: data.testName || 'Practice Test',
             modules: [{
               moduleNumber: 1,
-              moduleName: 'Module 1',
+              moduleName: 'English',
               questions: data.questions || [],
               userAnswers: data.userAnswers || [],
               flaggedQuestions: data.flaggedQuestions || [],
@@ -67,7 +68,7 @@ const MultiModuleReview = () => {
               maxScore: data.questions?.length || 0,
               percentage: 0,
               timeSpent: 0,
-              difficulty: 'Medium'
+              difficulty: 'Easy'
             }],
             totalScore: 0,
             totalMaxScore: data.questions?.length || 0,
@@ -102,8 +103,9 @@ const MultiModuleReview = () => {
   const userAnswer = currentModuleData?.userAnswers?.find(a => a.questionIndex === currentQuestion);
   const isFlagged = currentModuleData?.flaggedQuestions?.includes(currentQuestion);
   
-  const isCorrect = userAnswer && userAnswer.answer === question?.correctAnswer;
-  const hasAnswer = userAnswer && userAnswer.answer;
+  const isCorrect = userAnswer && userAnswer.answer !== undefined && userAnswer.answer !== '' ? 
+    validateAnswer(userAnswer.answer, question?.correctAnswer, question?.type, question?.options) : false;
+  const hasAnswer = userAnswer && userAnswer.answer !== undefined && userAnswer.answer !== '';
 
   const getAnswerStatus = () => {
     if (!hasAnswer) return { icon: <XCircle className="h-4 w-4 text-gray-400" />, text: "Not Answered", color: "text-gray-400" };

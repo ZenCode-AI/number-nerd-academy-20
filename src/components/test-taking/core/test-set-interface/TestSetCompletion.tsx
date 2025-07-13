@@ -16,7 +16,21 @@ const TestSetCompletion = ({ testSet, moduleResults }: TestSetCompletionProps) =
   const navigate = useNavigate();
 
   const handleReviewAnswers = () => {
-    navigate(`/student/test/${testSet.id}/multi-module-review`);
+    // Check if this is a single module test or multi-module test set
+    if (moduleResults.length === 1) {
+      // For single module tests, use the simple review page
+      const singleModuleData = {
+        questions: moduleResults[0].questions || [],
+        userAnswers: moduleResults[0].userAnswers || [],
+        flaggedQuestions: moduleResults[0].flaggedQuestions || [],
+        testName: testSet.name
+      };
+      localStorage.setItem('reviewData', JSON.stringify(singleModuleData));
+      navigate('/student/test/digital-sat-practice/review');
+    } else {
+      // For multi-module test sets, use the comprehensive review
+      navigate(`/student/test/${testSet.id}/multi-module-review`);
+    }
   };
 
   const handleBackToDashboard = () => {
