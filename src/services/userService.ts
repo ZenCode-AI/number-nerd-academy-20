@@ -1,40 +1,70 @@
-import { User } from '@/types/user';
+// Legacy user service for backward compatibility
+import { userService as supabaseUserService } from '@/services/supabase/userService';
+import { AuthUser } from '@/services/supabase/authService';
 
 export const userService = {
-  getCurrentUser: (): User | null => {
-    try {
-      const savedUser = localStorage.getItem('auth_user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch (error) {
-      console.error('Failed to get current user:', error);
+  getCurrentUser: async (): Promise<AuthUser | null> => {
+    const { data, error } = await supabaseUserService.getCurrentUser();
+    
+    if (error || !data) {
       return null;
     }
+
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      plan: data.plan,
+      isAuthenticated: true,
+      avatar: data.avatar_url,
+      phone: data.phone,
+      createdAt: data.created_at,
+      preferences: (data.preferences as any) || {
+        notifications: true,
+        theme: 'light',
+        language: 'en'
+      }
+    };
   },
 
-  setCurrentUser: (user: User | null): void => {
-    if (user) {
-      localStorage.setItem('auth_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('auth_user');
-    }
+  setCurrentUser: (user: AuthUser | null): void => {
+    // This is a no-op since Supabase manages auth state
+    console.warn('setCurrentUser is deprecated with Supabase auth');
   },
 
-  isAuthenticated: (): boolean => {
-    const user = userService.getCurrentUser();
+  isAuthenticated: async (): Promise<boolean> => {
+    const user = await userService.getCurrentUser();
     return user !== null && user.isAuthenticated;
   },
 
-  getUserPlan: (): string => {
-    const user = userService.getCurrentUser();
+  getUserPlan: async (): Promise<string> => {
+    const user = await userService.getCurrentUser();
     return user?.plan || 'Free';
   },
 
-  updateUser: (updates: Partial<User>): User | null => {
-    const currentUser = userService.getCurrentUser();
-    if (!currentUser) return null;
+  updateUser: async (updates: Partial<AuthUser>): Promise<AuthUser | null> => {
+    const { data, error } = await supabaseUserService.updateProfile(updates);
+    
+    if (error || !data) {
+      return null;
+    }
 
-    const updatedUser = { ...currentUser, ...updates };
-    userService.setCurrentUser(updatedUser);
-    return updatedUser;
+    return {
+      id: data.id,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      plan: data.plan,
+      isAuthenticated: true,
+      avatar: data.avatar_url,
+      phone: data.phone,
+      createdAt: data.created_at,
+      preferences: (data.preferences as any) || {
+        notifications: true,
+        theme: 'light',
+        language: 'en'
+      }
+    };
   }
 };

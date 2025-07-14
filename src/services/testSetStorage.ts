@@ -1,75 +1,132 @@
-
+// Legacy test set storage for backward compatibility
+import { testService } from '@/services/supabase/testService';
 import { TestSet } from '@/types/testSet';
 
 class TestSetStorageService {
   private storageKey = 'nna_saved_test_sets';
 
-  getAllTestSets(): TestSet[] {
+  async getAllTestSets(): Promise<TestSet[]> {
     try {
-      const stored = localStorage.getItem(this.storageKey);
-      return stored ? JSON.parse(stored) : [];
+      // Get tests from Supabase
+      const { data, error } = await testService.getAllTests();
+      
+      if (error || !data) {
+        console.error('Error loading test sets:', error);
+        return [];
+      }
+
+      // Convert to TestSet format - simplified for compatibility
+      return data.map(test => ({
+        id: test.id,
+        name: test.name,
+        description: test.description || '',
+        modules: [], // This would need to be populated from test_modules table
+        status: test.status as 'Draft' | 'Active' | 'Inactive',
+        plan: test.plan,
+        createdAt: test.created_at,
+        updatedAt: test.updated_at,
+        adaptiveConfig: null
+      }));
     } catch (error) {
       console.error('Error loading test sets:', error);
       return [];
     }
   }
 
-  saveTestSet(testSet: TestSet): void {
+  async saveTestSet(testSet: TestSet): Promise<void> {
     try {
-      const testSets = this.getAllTestSets();
-      const existingIndex = testSets.findIndex(ts => ts.id === testSet.id);
-      
-      if (existingIndex >= 0) {
-        testSets[existingIndex] = { ...testSet, updatedAt: new Date().toISOString() };
+      if (testSet.id) {
+        // Update existing test
+        await testService.updateTest(testSet.id, {
+          name: testSet.name,
+          description: testSet.description,
+          status: testSet.status as any,
+          plan: testSet.plan
+        });
       } else {
-        testSets.push(testSet);
+        // Create new test
+        await testService.createTest({
+          name: testSet.name,
+          description: testSet.description,
+          subject: 'Mixed', // Default subject
+          difficulty: 'Medium', // Default difficulty
+          duration: 60, // Default duration
+          plan: testSet.plan,
+          status: testSet.status as any,
+          totalScore: 0
+        });
       }
-      
-      localStorage.setItem(this.storageKey, JSON.stringify(testSets));
     } catch (error) {
       console.error('Error saving test set:', error);
       throw new Error('Failed to save test set');
     }
   }
 
-  getTestSetById(id: string): TestSet | undefined {
-    return this.getAllTestSets().find(testSet => testSet.id === id);
+  async getTestSetById(id: string): Promise<TestSet | undefined> {
+    const { data, error } = await testService.getTestById(id);
+    
+    if (error || !data) {
+      return undefined;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      modules: [],
+      status: data.status as 'Draft' | 'Active' | 'Inactive',
+      plan: data.plan,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      adaptiveConfig: null
+    };
   }
 
-  deleteTestSet(id: string): void {
+  async deleteTestSet(id: string): Promise<void> {
     try {
-      const testSets = this.getAllTestSets().filter(testSet => testSet.id !== id);
-      localStorage.setItem(this.storageKey, JSON.stringify(testSets));
+      const { error } = await testService.deleteTest(id);
+      if (error) {
+        throw new Error('Failed to delete test set');
+      }
     } catch (error) {
       console.error('Error deleting test set:', error);
       throw new Error('Failed to delete test set');
     }
   }
 
-  copyTestSet(originalId: string, modifications?: Partial<TestSet>): TestSet {
-    const originalTestSet = this.getTestSetById(originalId);
+  async copyTestSet(originalId: string, modifications?: Partial<TestSet>): Promise<TestSet> {
+    const originalTestSet = await this.getTestSetById(originalId);
     if (!originalTestSet) {
       throw new Error('Original test set not found');
     }
 
-    const copiedTestSet: TestSet = {
-      ...JSON.parse(JSON.stringify(originalTestSet)),
-      id: `testset_${Date.now()}`,
+    const { data, error } = await testService.createTest({
       name: `${originalTestSet.name} (Copy)`,
-      status: 'Draft' as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      description: originalTestSet.description,
+      subject: 'Mixed',
+      difficulty: 'Medium',
+      duration: 60,
+      plan: originalTestSet.plan,
+      status: 'Draft' as any,
+      totalScore: 0,
       ...modifications
+    });
+
+    if (error || !data) {
+      throw new Error('Failed to copy test set');
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      modules: [],
+      status: data.status as 'Draft' | 'Active' | 'Inactive',
+      plan: data.plan,
+      createdAt: data.created_at,
+      updatedAt: data.updated_at,
+      adaptiveConfig: null
     };
-
-    // Update module IDs to ensure uniqueness
-    copiedTestSet.modules = copiedTestSet.modules.map((module, index) => ({
-      ...module,
-      id: `module_${Date.now()}_${index}`
-    }));
-
-    this.saveTestSet(copiedTestSet);
-    return copiedTestSet;
   }
 }
 

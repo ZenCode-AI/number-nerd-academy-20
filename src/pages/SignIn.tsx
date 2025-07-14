@@ -52,7 +52,7 @@ const SignIn = () => {
         });
         setIsSignUp(false);
       } else {
-        await login({ email: formData.email, password: formData.password });
+        await login(formData.email, formData.password);
         toast({
           title: "Welcome!",
           description: "You have been signed in successfully.",

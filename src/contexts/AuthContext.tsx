@@ -1,16 +1,22 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { authAPI } from '@/api/auth';
-import { useAuthState } from '@/hooks/useAuthState';
-import { User, AuthState, LoginCredentials } from '@/types/user';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { AuthUser } from '@/services/supabase/authService';
 import { handleApiError, logError } from '@/utils/errorHandling';
 
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
-  updateUser: (updates: Partial<User>) => void;
+interface AuthContextType {
+  user: AuthUser | null;
+  isLoading: boolean;
+  isInitialized: boolean;
+  signIn: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string, name?: string) => Promise<any>;
+  signOut: () => Promise<void>;
+  updateUser: (updates: Partial<AuthUser>) => Promise<any>;
   isAdmin: boolean;
   isStudent: boolean;
+  // Legacy method names for backward compatibility
+  login: (email: string, password: string) => Promise<any>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,44 +34,40 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const { user, setUser, updateUser, clearUser, isLoading, isInitialized } = useAuthState();
+  const auth = useSupabaseAuth();
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (email: string, password: string) => {
     try {
-      const userData = await authAPI.login(credentials.email, credentials.password);
-      setUser(userData);
-      // Store in localStorage
-      localStorage.setItem('auth_user', JSON.stringify(userData));
+      return await auth.signIn(email, password);
     } catch (error) {
       logError(error, 'AuthProvider.login');
       throw new Error(handleApiError(error));
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     try {
-      clearUser();
-      localStorage.removeItem('auth_user');
-      authAPI.logout();
+      await auth.signOut();
     } catch (error) {
       logError(error, 'AuthProvider.logout');
     }
   };
 
-  const isAdmin = user?.role === 'admin';
-  const isStudent = user?.role === 'student';
-
   return (
     <AuthContext.Provider
       value={{
-        user,
-        isLoading,
-        isInitialized,
+        user: auth.user,
+        isLoading: auth.isLoading,
+        isInitialized: auth.isInitialized,
+        signIn: login,
+        signUp: auth.signUp,
+        signOut: logout,
+        updateUser: auth.updateUser,
+        isAdmin: auth.isAdmin,
+        isStudent: auth.isStudent,
+        // Legacy method names for backward compatibility
         login,
         logout,
-        updateUser,
-        isAdmin,
-        isStudent,
       }}
     >
       {children}

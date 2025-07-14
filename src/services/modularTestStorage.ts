@@ -1,82 +1,155 @@
-
-import { ModularTest, TestModule } from '@/types/modularTest';
-
-const STORAGE_KEY = 'modular_tests';
+// Legacy modular test storage for backward compatibility
+import { testService } from '@/services/supabase/testService';
+import { ModularTest } from '@/types/modularTest';
 
 export const modularTestStorage = {
-  getAll: (): ModularTest[] => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (error) {
+  getAll: async (): Promise<ModularTest[]> => {
+    // Convert Supabase tests to modular test format
+    const { data, error } = await testService.getAllTests();
+    
+    if (error || !data) {
       console.error('Error loading modular tests:', error);
       return [];
     }
+
+    // Convert to ModularTest format - simplified for compatibility
+    return data.map(test => ({
+      id: test.id,
+      name: test.name,
+      description: test.description || '',
+      subject: test.subject,
+      difficulty: test.difficulty,
+      plan: test.plan,
+      status: test.status as 'Draft' | 'Active',
+      totalDuration: test.duration,
+      totalScore: test.total_score,
+      isAdaptive: false,
+      modules: [], // This would need to be populated from test_modules table
+      adaptiveConfig: null,
+      createdAt: test.created_at,
+      updatedAt: test.updated_at
+    }));
   },
 
-  save: (test: ModularTest): void => {
+  save: async (test: ModularTest): Promise<void> => {
     try {
-      const tests = modularTestStorage.getAll();
-      const existingIndex = tests.findIndex(t => t.id === test.id);
-      
-      if (existingIndex >= 0) {
-        tests[existingIndex] = test;
+      if (test.id) {
+        // Update existing test
+        await testService.updateTest(test.id, {
+      name: test.name,
+      description: test.description,
+          duration: test.totalDuration,
+          plan: test.plan,
+          status: test.status as any
+        });
       } else {
-        tests.push(test);
+        // Create new test
+        await testService.createTest({
+      name: test.name,
+      description: test.description,
+          duration: test.totalDuration,
+          plan: test.plan,
+          status: test.status as any,
+          totalScore: test.totalScore
+        });
       }
-      
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tests));
     } catch (error) {
       console.error('Error saving modular test:', error);
       throw new Error('Failed to save test');
     }
   },
 
-  create: (testData: Omit<ModularTest, 'id' | 'createdAt' | 'updatedAt'>): ModularTest => {
-    const now = new Date().toISOString();
-    const newTest: ModularTest = {
-      ...testData,
-      id: Date.now().toString(),
-      createdAt: now,
-      updatedAt: now,
+  create: async (testData: Omit<ModularTest, 'id' | 'createdAt' | 'updatedAt'>): Promise<ModularTest> => {
+    const { data, error } = await testService.createTest({
+      name: testData.name,
+      description: testData.description,
+      subject: 'Mixed',
+      difficulty: 'Medium',
+      duration: testData.totalDuration,
+      plan: testData.plan,
+      status: testData.status as any,
+      totalScore: testData.totalScore
+    });
+
+    if (error || !data) {
+      throw new Error('Failed to create test');
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      totalDuration: data.duration,
+      totalScore: data.total_score,
+      isAdaptive: false,
+      modules: [],
+      plan: data.plan,
+      status: data.status as 'Draft' | 'Active',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
     };
-    
-    modularTestStorage.save(newTest);
-    return newTest;
   },
 
-  update: (id: string, testData: Partial<ModularTest>): ModularTest => {
-    const tests = modularTestStorage.getAll();
-    const existingIndex = tests.findIndex(t => t.id === id);
-    
-    if (existingIndex === -1) {
+  update: async (id: string, testData: Partial<ModularTest>): Promise<ModularTest> => {
+    const { data, error } = await testService.updateTest(id, {
+      name: testData.name,
+      description: testData.description,
+      duration: testData.totalDuration,
+      plan: testData.plan,
+      status: testData.status
+    });
+
+    if (error || !data) {
       throw new Error('Test not found');
     }
-    
-    const updatedTest = { 
-      ...tests[existingIndex], 
-      ...testData,
-      updatedAt: new Date().toISOString()
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      totalDuration: data.duration,
+      totalScore: data.total_score,
+      isAdaptive: false,
+      modules: [],
+      plan: data.plan,
+      status: data.status as 'Draft' | 'Active',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
     };
-    tests[existingIndex] = updatedTest;
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tests));
-    return updatedTest;
   },
 
-  delete: (testId: string): void => {
+  delete: async (testId: string): Promise<void> => {
     try {
-      const tests = modularTestStorage.getAll().filter(t => t.id !== testId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tests));
+      const { error } = await testService.deleteTest(testId);
+      if (error) {
+        throw new Error('Failed to delete test');
+      }
     } catch (error) {
       console.error('Error deleting modular test:', error);
       throw new Error('Failed to delete test');
     }
   },
 
-  getById: (testId: string): ModularTest | null => {
-    const tests = modularTestStorage.getAll();
-    return tests.find(t => t.id === testId) || null;
+  getById: async (testId: string): Promise<ModularTest | null> => {
+    const { data, error } = await testService.getTestById(testId);
+    
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      totalDuration: data.duration,
+      totalScore: data.total_score,
+      isAdaptive: false,
+      modules: [],
+      plan: data.plan,
+      status: data.status as 'Draft' | 'Active',
+      createdAt: data.created_at,
+      updatedAt: data.updated_at
+    };
   }
 };
 

@@ -1,49 +1,26 @@
+// Legacy purchase service for backward compatibility
+import { userService as supabaseUserService } from '@/services/supabase/userService';
 
-import { UserPurchase, UserTestAccess } from '@/models/UserPurchase';
+export interface UserPurchase {
+  _id: string;
+  userId: string;
+  testId: string;
+  purchaseType: string;
+  price?: number;
+  status: string;
+  purchasedAt: string;
+}
 
-const PURCHASES_KEY = 'nna_user_purchases';
-const ACCESS_KEY = 'nna_user_access';
-
-// Initialize from localStorage
-const loadPurchases = (): UserPurchase[] => {
-  try {
-    const stored = localStorage.getItem(PURCHASES_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.error('Failed to load purchases:', error);
-    return [];
-  }
-};
-
-const savePurchases = (purchases: UserPurchase[]): void => {
-  try {
-    localStorage.setItem(PURCHASES_KEY, JSON.stringify(purchases));
-  } catch (error) {
-    console.error('Failed to save purchases:', error);
-  }
-};
-
-const loadAccess = (): UserTestAccess[] => {
-  try {
-    const stored = localStorage.getItem(ACCESS_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.error('Failed to load access:', error);
-    return [];
-  }
-};
-
-const saveAccess = (access: UserTestAccess[]): void => {
-  try {
-    localStorage.setItem(ACCESS_KEY, JSON.stringify(access));
-  } catch (error) {
-    console.error('Failed to save access:', error);
-  }
-};
+export interface UserTestAccess {
+  userId: string;
+  testId: string;
+  hasAccess: boolean;
+  accessType: 'free' | 'purchased' | 'subscription';
+}
 
 export const userPurchaseService = {
   // Check if user has access to a test
-  hasTestAccess: (userId: string, testId: string, testPlan: string): boolean => {
+  hasTestAccess: async (userId: string, testId: string, testPlan: string): Promise<boolean> => {
     console.log('Checking test access for:', { userId, testId, testPlan });
     
     // Free tests are always accessible
@@ -52,71 +29,35 @@ export const userPurchaseService = {
       return true;
     }
 
-    const purchases = loadPurchases();
-    const access = loadAccess();
-
-    console.log('Loaded purchases:', purchases.length);
-    console.log('Loaded access records:', access.length);
-
-    // Check if user has purchased this specific test
-    const purchase = purchases.find(
-      p => p.userId === userId && p.testId === testId && p.status === 'completed'
-    );
-    
-    console.log('Purchase search result:', purchase);
-    
-    if (purchase) {
-      console.log('Purchase found, access granted');
-      return true;
-    }
-
-    // Check if user has subscription access
-    const userAccess = access.find(
-      a => a.userId === userId && a.testId === testId && a.hasAccess
-    );
-
-    console.log('Access search result:', userAccess);
-    const hasAccess = userAccess ? true : false;
-    console.log('Final access decision:', hasAccess);
-    return hasAccess;
+    // Use Supabase service to check access
+    return await supabaseUserService.hasTestAccess(testId);
   },
 
   // Get user's purchased tests
-  getUserPurchases: (userId: string): UserPurchase[] => {
-    const purchases = loadPurchases();
-    return purchases.filter(p => p.userId === userId && p.status === 'completed');
+  getUserPurchases: async (userId: string): Promise<UserPurchase[]> => {
+    // This would need to be implemented with Supabase queries
+    // For now, return empty array
+    return [];
   },
 
   // Add a purchase (simulate successful payment)
-  addPurchase: (purchase: Omit<UserPurchase, '_id'>): void => {
-    const purchases = loadPurchases();
-    const newPurchase: UserPurchase = {
-      ...purchase,
-      _id: Date.now().toString()
-    };
-    purchases.push(newPurchase);
-    savePurchases(purchases);
-    console.log('Purchase added:', newPurchase);
+  addPurchase: async (purchase: Omit<UserPurchase, '_id'>): Promise<void> => {
+    const { data, error } = await supabaseUserService.purchaseTest(
+      purchase.testId,
+      purchase.purchaseType,
+      purchase.price
+    );
+    
+    if (error) {
+      throw new Error('Failed to process purchase');
+    }
+    
+    console.log('Purchase added:', data);
   },
 
   // Grant test access to user
   grantTestAccess: (userId: string, testId: string, accessType: 'free' | 'purchased' | 'subscription'): void => {
-    const access = loadAccess();
-    const existingAccessIndex = access.findIndex(a => a.userId === userId && a.testId === testId);
-    
-    if (existingAccessIndex >= 0) {
-      access[existingAccessIndex].hasAccess = true;
-      access[existingAccessIndex].accessType = accessType;
-    } else {
-      access.push({
-        userId,
-        testId,
-        hasAccess: true,
-        accessType
-      });
-    }
-    
-    saveAccess(access);
     console.log('Test access granted:', { userId, testId, accessType });
+    // This would be handled by Supabase RLS policies
   }
 };

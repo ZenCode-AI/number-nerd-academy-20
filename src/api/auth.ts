@@ -1,45 +1,51 @@
+// Legacy auth API for backward compatibility
+// This file provides compatibility with the old auth API structure
 
-import { User } from '@/types/user';
-import { ApiResponse } from './types';
+import { authService, AuthUser } from '@/services/supabase/authService';
 
-// Mock authentication - replace with real API calls
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
 export const authAPI = {
-  async login(email: string, password: string): Promise<User> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+  async login(email: string, password: string): Promise<AuthUser> {
+    const { data, error } = await authService.signIn(email, password);
     
-    // Mock user data based on email
-    const isAdmin = email.includes('admin');
-    const mockUser: User = {
-      id: isAdmin ? 'admin-123' : 'student-123',
-      email,
-      name: isAdmin ? 'Admin User' : 'Student User',
-      role: isAdmin ? 'admin' : 'student',
-      plan: isAdmin ? 'Premium' : 'Free',
-      isAuthenticated: true,
-    };
+    if (error) {
+      throw new Error(error.message);
+    }
 
-    return mockUser;
+    if (!data.user) {
+      throw new Error('Authentication failed');
+    }
+
+    const authUser = await authService.convertUser(data.user, data.session!);
+    if (!authUser) {
+      throw new Error('Failed to load user profile');
+    }
+
+    return authUser;
   },
 
   async logout(): Promise<void> {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const { error } = await authService.signOut();
+    if (error) {
+      throw new Error(error.message);
+    }
   },
 
-  async getCurrentUser(): Promise<User | null> {
-    const savedUser = localStorage.getItem('auth_user');
-    return savedUser ? JSON.parse(savedUser) : null;
+  async getCurrentUser(): Promise<AuthUser | null> {
+    return await authService.getCurrentUser();
   },
 
-  async updateProfile(userData: Partial<User>): Promise<User> {
-    const currentUser = await this.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('User not authenticated');
+  async updateProfile(userData: Partial<AuthUser>): Promise<AuthUser> {
+    const { data, error } = await authService.updateProfile(userData);
+    
+    if (error) {
+      throw new Error(error.message);
     }
 
-    const updatedUser = { ...currentUser, ...userData };
-    localStorage.setItem('auth_user', JSON.stringify(updatedUser));
-    return updatedUser;
+    return data as AuthUser;
   },
 };
