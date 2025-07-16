@@ -24,10 +24,13 @@ export const useTestSetModuleLogic = () => {
 
   // Check if user has access to this test
   useEffect(() => {
-    if (currentUser && testSet && !userPurchaseService.hasTestAccess(currentUser.id, testSet.id, testSet.plan || 'Free')) {
-      navigate('/student');
-      return;
-    }
+    const checkAccess = async () => {
+      if (currentUser && testSet && !(await userPurchaseService.hasTestAccess(currentUser.id, testSet.id, testSet.plan || 'Free'))) {
+        navigate('/student');
+        return;
+      }
+    };
+    checkAccess();
   }, [currentUser, testSet, navigate]);
 
   const navigateToQuestion = (index: number) => {

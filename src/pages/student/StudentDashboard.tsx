@@ -41,18 +41,21 @@ const StudentDashboard = () => {
     // Load available tests
     const modularTests = await modularTestStorage.getAll();
     const availableTests = modularTests
-      .filter(test => test.status === 'Active')
-      .map(test => {
-        const displayTest = convertModularTestForDisplay(test);
-        return {
-          ...displayTest,
-          hasAccess: userPurchaseService.hasTestAccess(user!.id, test.id, test.plan),
-          isPurchased: test.plan !== 'Free' && userPurchaseService.hasTestAccess(user!.id, test.id, test.plan)
-        };
-      })
-      .slice(0, 4);
+      .filter(test => test.status === 'Active');
 
-    setRecentTests(availableTests);
+    // Process tests with access info
+    const testsWithAccess = [];
+    for (const test of availableTests) {
+      const displayTest = convertModularTestForDisplay(test);
+      const hasAccess = await userPurchaseService.hasTestAccess(user!.id, test.id, test.plan);
+      testsWithAccess.push({
+        ...displayTest,
+        hasAccess,
+        isPurchased: test.plan !== 'Free' && hasAccess
+      });
+    }
+    
+    setRecentTests(testsWithAccess.slice(0, 4));
 
     // Calculate stats
     const totalTests = modularTests.filter(test => test.status === 'Active').length;
