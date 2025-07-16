@@ -1,5 +1,6 @@
 
 import { ApiException } from './types';
+import { supabase } from '@/integrations/supabase/client';
 
 class ApiClient {
   private baseURL: string;
@@ -23,19 +24,12 @@ class ApiClient {
     };
 
     // Add auth token if available
-    const user = localStorage.getItem('auth_user');
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        if (userData.token) {
-          config.headers = {
-            ...config.headers,
-            Authorization: `Bearer ${userData.token}`,
-          };
-        }
-      } catch (error) {
-        console.warn('Failed to parse auth user:', error);
-      }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${session.access_token}`,
+      };
     }
 
     try {

@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Search, BookOpen, Calculator, Check, Clock, Target, FileText } from 'lucide-react';
-import { testStorage, SavedTest } from '@/services/testStorage';
+import { modularTestStorage } from '@/services/modularTestStorage';
+import { ModularTest } from '@/types/modularTest';
 
 interface TestSelectorProps {
   selectedTestId?: string;
@@ -16,12 +17,21 @@ interface TestSelectorProps {
 
 const TestSelector = ({ selectedTestId, onSelectTest, subjectFilter }: TestSelectorProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [tests] = useState<SavedTest[]>(testStorage.getAllTests());
+  const [tests, setTests] = useState<ModularTest[]>([]);
+
+  React.useEffect(() => {
+    const loadTests = async () => {
+      const allTests = await modularTestStorage.getAll();
+      setTests(allTests);
+    };
+    loadTests();
+  }, []);
 
   const filteredTests = tests.filter(test => {
-    const matchesSearch = test.details.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         test.details.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSubject = !subjectFilter || test.details.subject === subjectFilter;
+    const matchesSearch = test.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (test.description || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const testSubject = test.modules[0]?.subject;
+    const matchesSubject = !subjectFilter || testSubject === subjectFilter;
     return matchesSearch && matchesSubject && test.status === 'Active';
   });
 
@@ -59,7 +69,8 @@ const TestSelector = ({ selectedTestId, onSelectTest, subjectFilter }: TestSelec
           </div>
         ) : (
           filteredTests.map((test) => {
-            const SubjectIcon = getSubjectIcon(test.details.subject);
+            const testSubject = test.modules[0]?.subject || 'Math';
+            const SubjectIcon = getSubjectIcon(testSubject);
             const isSelected = selectedTestId === test.id;
             
             return (
@@ -74,7 +85,7 @@ const TestSelector = ({ selectedTestId, onSelectTest, subjectFilter }: TestSelec
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2 flex-1">
                       <SubjectIcon className="h-4 w-4" />
-                      <CardTitle className="text-sm truncate">{test.details.name}</CardTitle>
+                      <CardTitle className="text-sm truncate">{test.name}</CardTitle>
                     </div>
                     {isSelected && (
                       <Check className="h-4 w-4 text-blue-600 flex-shrink-0" />
@@ -82,37 +93,31 @@ const TestSelector = ({ selectedTestId, onSelectTest, subjectFilter }: TestSelec
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p className="text-xs text-gray-600 line-clamp-2">{test.details.description}</p>
+                  <p className="text-xs text-gray-600 line-clamp-2">{test.description}</p>
                   
                   <div className="flex flex-wrap gap-1">
                     <Badge variant="outline" className="text-xs">
                       <SubjectIcon className="h-3 w-3 mr-1" />
-                      {test.details.subject}
+                      {testSubject}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       <Target className="h-3 w-3 mr-1" />
-                      {test.details.difficulty}
+                      {test.modules[0]?.difficulty || 'Medium'}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       <Clock className="h-3 w-3 mr-1" />
-                      {test.details.duration}min
+                      {test.totalDuration}min
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
                     <div>
-                      <span className="font-medium">{test.questions.length}</span> questions
+                      <span className="font-medium">{test.modules.reduce((total, module) => total + module.questions.length, 0)}</span> questions
                     </div>
                     <div>
-                      <span className="font-medium">{test.totalPoints}</span> points
+                      <span className="font-medium">{test.totalScore}</span> points
                     </div>
                   </div>
-
-                  {test.passage && (
-                    <Badge variant="secondary" className="text-xs w-fit">
-                      Reading Passage
-                    </Badge>
-                  )}
                 </CardContent>
               </Card>
             );

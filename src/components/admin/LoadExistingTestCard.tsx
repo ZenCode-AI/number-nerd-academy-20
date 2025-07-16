@@ -3,10 +3,10 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText } from 'lucide-react';
-import { SavedTest } from '@/services/testStorage';
+import { ModularTest } from '@/types/modularTest';
 
 interface LoadExistingTestCardProps {
-  savedTests: SavedTest[];
+  savedTests: ModularTest[];
   onLoadTest: (testId: string) => void;
 }
 
@@ -29,10 +29,10 @@ const LoadExistingTestCard = ({ savedTests, onLoadTest }: LoadExistingTestCardPr
               className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer" 
               onClick={() => onLoadTest(test.id)}
             >
-              <h4 className="font-medium text-sm truncate">{test.details.name}</h4>
+              <h4 className="font-medium text-sm truncate">{test.name}</h4>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="text-xs">{test.details.subject}</Badge>
-                <Badge variant="secondary" className="text-xs">{test.questions.length}Q</Badge>
+                <Badge variant="outline" className="text-xs">{test.modules[0]?.subject || 'Mixed'}</Badge>
+                <Badge variant="secondary" className="text-xs">{test.modules.reduce((total, module) => total + module.questions.length, 0)}Q</Badge>
               </div>
             </div>
           ))}

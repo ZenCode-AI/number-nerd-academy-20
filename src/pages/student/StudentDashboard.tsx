@@ -19,11 +19,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { modularTestStorage, convertModularTestForDisplay } from '@/services/modularTestStorage';
 import { userPurchaseService } from '@/services/userPurchaseService';
+import { supabase } from '@/integrations/supabase/client';
 
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [recentTests, setRecentTests] = useState<any[]>([]);
+  const [testScores, setTestScores] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({
     totalTests: 0,
     completedTests: 0,
@@ -43,11 +45,19 @@ const StudentDashboard = () => {
     const availableTests = modularTests
       .filter(test => test.status === 'Active');
 
-    // Process tests with access info
+    // Process tests with access info and scores
     const testsWithAccess = [];
+    const scores: Record<string, number> = {};
+    
     for (const test of availableTests) {
       const displayTest = convertModularTestForDisplay(test);
       const hasAccess = await userPurchaseService.hasTestAccess(user!.id, test.id, test.plan);
+      const bestScore = await getTestScore(test.id);
+      
+      if (bestScore !== null) {
+        scores[test.id] = bestScore;
+      }
+      
       testsWithAccess.push({
         ...displayTest,
         hasAccess,
@@ -55,16 +65,28 @@ const StudentDashboard = () => {
       });
     }
     
+    setTestScores(scores);
     setRecentTests(testsWithAccess.slice(0, 4));
 
-    // Calculate stats
+    // Calculate stats from Supabase
     const totalTests = modularTests.filter(test => test.status === 'Active').length;
-    const attempts = JSON.parse(localStorage.getItem('testAttempts') || '[]');
-    const userAttempts = attempts.filter((attempt: any) => attempt.userId === user!.id);
-    const completedTests = new Set(userAttempts.map((attempt: any) => attempt.testId)).size;
-    const totalScore = userAttempts.reduce((sum: number, attempt: any) => sum + (attempt.score || 0), 0);
-    const averageScore = userAttempts.length > 0 ? Math.round(totalScore / userAttempts.length) : 0;
-    const totalTime = userAttempts.reduce((sum: number, attempt: any) => sum + (attempt.timeSpent || 0), 0);
+    
+    // Fetch user's test attempts from Supabase
+    const { data: userAttempts, error: attemptsError } = await supabase
+      .from('test_attempts')
+      .select('*')
+      .eq('user_id', user!.id)
+      .eq('status', 'completed');
+
+    if (attemptsError) {
+      console.error('Error fetching test attempts:', attemptsError);
+    }
+
+    const attempts = userAttempts || [];
+    const completedTests = new Set(attempts.map(attempt => attempt.test_id)).size;
+    const totalScore = attempts.reduce((sum, attempt) => sum + (attempt.total_score || 0), 0);
+    const averageScore = attempts.length > 0 ? Math.round(totalScore / attempts.length) : 0;
+    const totalTime = attempts.reduce((sum, attempt) => sum + (attempt.time_spent || 0), 0);
 
     setStats({
       totalTests,
@@ -74,14 +96,17 @@ const StudentDashboard = () => {
     });
   };
 
-  const getTestScore = (testId: string) => {
-    const attempts = JSON.parse(localStorage.getItem('testAttempts') || '[]');
-    const testAttempts = attempts.filter((attempt: any) => 
-      attempt.testId === testId && attempt.userId === user!.id
-    );
-    if (testAttempts.length === 0) return null;
+  const getTestScore = async (testId: string) => {
+    const { data: testAttempts, error } = await supabase
+      .from('test_attempts')
+      .select('total_score')
+      .eq('test_id', testId)
+      .eq('user_id', user!.id)
+      .eq('status', 'completed');
+
+    if (error || !testAttempts || testAttempts.length === 0) return null;
     
-    const bestScore = Math.max(...testAttempts.map((attempt: any) => attempt.score || 0));
+    const bestScore = Math.max(...testAttempts.map(attempt => attempt.total_score || 0));
     return bestScore;
   };
 
@@ -163,8 +188,8 @@ const StudentDashboard = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recentTests.map((test) => {
-              const bestScore = getTestScore(test.id);
-              const hasAttempted = bestScore !== null;
+              const bestScore = testScores[test.id];
+              const hasAttempted = bestScore !== undefined;
               
               return (
                 <Card key={test.id} className="border border-gray-200">

@@ -1,5 +1,6 @@
 
 import { ApiException, RequestOptions, ApiResponse } from '@/types/api';
+import { supabase } from '@/integrations/supabase/client';
 
 class TypeSafeApiClient {
   private baseURL: string;
@@ -9,17 +10,12 @@ class TypeSafeApiClient {
     this.baseURL = baseURL;
   }
 
-  private getAuthHeaders(): Record<string, string> {
-    const user = localStorage.getItem('auth_user');
-    if (user) {
-      try {
-        const userData = JSON.parse(user);
-        return {
-          Authorization: `Bearer ${userData.token || 'mock-token'}`,
-        };
-      } catch (error) {
-        console.warn('Failed to parse auth user:', error);
-      }
+  private async getAuthHeaders(): Promise<Record<string, string>> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return {
+        Authorization: `Bearer ${session.access_token}`,
+      };
     }
     return {};
   }
@@ -30,11 +26,12 @@ class TypeSafeApiClient {
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseURL}${endpoint}`;
     
+    const authHeaders = await this.getAuthHeaders();
     const config: RequestInit = {
       method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
+        ...authHeaders,
         ...options.headers,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,

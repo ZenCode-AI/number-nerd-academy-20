@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { TestSetModule } from '@/types/testSet';
-import { testStorage } from '@/services/testStorage';
+import { modularTestStorage } from '@/services/modularTestStorage';
 import TestSelector from '@/components/admin/TestSelector';
 import { Plus, Trash2, BookOpen, Calculator, ArrowRight, Search } from 'lucide-react';
 
@@ -32,18 +32,18 @@ const ModulesCard = ({ modules, onAddModule, onRemoveModule }: ModulesCardProps)
 
   const [showTestSelector, setShowTestSelector] = useState(false);
 
-  const getTestDetails = (testId: string) => {
-    const test = testStorage.getTestById(testId);
+  const getTestDetails = async (testId: string) => {
+    const test = await modularTestStorage.getById(testId);
     return test ? {
-      name: test.details.name,
-      subject: test.details.subject,
-      duration: test.details.duration,
-      questionsCount: test.questions.length
+      name: test.name,
+      subject: test.modules[0]?.subject || 'Math',
+      duration: test.totalDuration,
+      questionsCount: test.modules.reduce((total, module) => total + module.questions.length, 0)
     } : null;
   };
 
-  const handleTestSelection = (testId: string) => {
-    const testDetails = getTestDetails(testId);
+  const handleTestSelection = async (testId: string) => {
+    const testDetails = await getTestDetails(testId);
     if (testDetails) {
       setNewModule(prev => ({
         ...prev,
@@ -56,10 +56,10 @@ const ModulesCard = ({ modules, onAddModule, onRemoveModule }: ModulesCardProps)
     }
   };
 
-  const addModule = () => {
+  const addModule = async () => {
     if (!newModule.name || !newModule.testId) return;
 
-    const testDetails = getTestDetails(newModule.testId);
+    const testDetails = await getTestDetails(newModule.testId);
     if (!testDetails) {
       alert('Selected test not found. Please select a valid test.');
       return;
@@ -106,7 +106,12 @@ const ModulesCard = ({ modules, onAddModule, onRemoveModule }: ModulesCardProps)
           <div className="space-y-4">
             {modules.map((module, index) => {
               const SubjectIcon = getSubjectIcon(module.subject);
-              const testDetails = getTestDetails(module.testId);
+              const [testDetails, setTestDetails] = React.useState<any>(null);
+              
+              React.useEffect(() => {
+                getTestDetails(module.testId).then(setTestDetails);
+              }, [module.testId]);
+              
               return (
                 <div key={module.id} className="flex items-center gap-4 p-4 border rounded-lg">
                   <div className="flex items-center gap-2">
@@ -145,7 +150,7 @@ const ModulesCard = ({ modules, onAddModule, onRemoveModule }: ModulesCardProps)
               <Label>Select Test</Label>
               <div className="flex gap-2">
                 <Input
-                  value={newModule.testId ? getTestDetails(newModule.testId)?.name || 'Unknown Test' : ''}
+                  value={newModule.name || ''}
                   placeholder="No test selected"
                   readOnly
                   className="flex-1"

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { authService } from '@/services/supabase/authService';
 
 const SignIn = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -45,10 +46,20 @@ const SignIn = () => {
           });
           return;
         }
-        // For now, redirect to sign in after sign up
+        
+        const { error } = await authService.signUp(formData.email, formData.password, formData.name);
+        if (error) {
+          toast({
+            title: "Sign Up Failed",
+            description: error.message,
+            variant: "destructive",
+          });
+          return;
+        }
+        
         toast({
           title: "Account Created",
-          description: "Please sign in with your credentials.",
+          description: "Please check your email to verify your account, then sign in.",
         });
         setIsSignUp(false);
       } else {
