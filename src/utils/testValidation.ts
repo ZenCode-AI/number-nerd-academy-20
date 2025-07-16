@@ -8,7 +8,7 @@ export const validateTestName = async (name: string, excludeId?: string): Promis
   
   try {
     const { modularTestStorage } = await import('@/services/modularTestStorage');
-    const existingTests = modularTestStorage.getAll();
+    const existingTests = await modularTestStorage.getAll();
     const isDuplicate = existingTests.some(test => 
       test.name.toLowerCase() === name.toLowerCase() && test.id !== excludeId
     );

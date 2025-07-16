@@ -45,9 +45,9 @@ const EditTestWizard = () => {
   // Load existing test data
   useEffect(() => {
     if (testId) {
-      const loadTest = () => {
+      const loadTest = async () => {
         try {
-          const existingTest = modularTestStorage.getById(testId);
+          const existingTest = await modularTestStorage.getById(testId);
           if (existingTest) {
             setTestData(existingTest);
           } else {

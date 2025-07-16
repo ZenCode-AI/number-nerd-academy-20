@@ -28,9 +28,9 @@ const EditTest = () => {
 
   useEffect(() => {
     if (testId) {
-      const loadTest = () => {
+      const loadTest = async () => {
         try {
-          const foundTest = modularTestStorage.getById(testId);
+          const foundTest = await modularTestStorage.getById(testId);
           if (foundTest) {
             setTest(foundTest);
             setFormData({

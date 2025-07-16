@@ -37,9 +37,9 @@ const StudentDashboard = () => {
     }
   }, [user]);
 
-  const loadDashboardData = () => {
+  const loadDashboardData = async () => {
     // Load available tests
-    const modularTests = modularTestStorage.getAll();
+    const modularTests = await modularTestStorage.getAll();
     const availableTests = modularTests
       .filter(test => test.status === 'Active')
       .map(test => {

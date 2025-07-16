@@ -12,7 +12,15 @@ export const useTestSetModuleLogic = () => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<number>>(new Set());
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const currentUser = userService.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const user = await userService.getCurrentUser();
+      setCurrentUser(user);
+    };
+    getUser();
+  }, []);
 
   // Check if user has access to this test
   useEffect(() => {

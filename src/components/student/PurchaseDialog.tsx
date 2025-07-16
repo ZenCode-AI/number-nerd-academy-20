@@ -70,11 +70,10 @@ const PurchaseDialog = ({ isOpen, onClose, test, onPurchaseComplete }: PurchaseD
       userPurchaseService.addPurchase({
         userId: user.id,
         testId: test.id,
-        purchaseDate: new Date(),
-        amount: parseFloat(getPlanPrice(test.plan).replace('$', '')),
-        currency: 'USD',
-        status: 'completed',
-        transactionId: `txn_${Date.now()}`
+        purchasedAt: new Date().toISOString(),
+        purchaseType: 'test',
+        price: parseFloat(getPlanPrice(test.plan).replace('$', '')),
+        status: 'completed'
       });
 
       // Grant test access

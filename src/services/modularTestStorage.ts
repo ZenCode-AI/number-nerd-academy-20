@@ -45,8 +45,10 @@ export const modularTestStorage = {
       } else {
         // Create new test
         await testService.createTest({
-      name: test.name,
-      description: test.description,
+          name: test.name,
+          description: test.description,
+          subject: test.modules?.[0]?.subject || 'Math',
+          difficulty: test.modules?.[0]?.difficulty || 'Medium',
           duration: test.totalDuration,
           plan: test.plan,
           status: test.status as any,

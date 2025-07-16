@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,15 +18,25 @@ const BrowseTests = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState('all');
   const [selectedModule, setSelectedModule] = useState('all');
   const [adminTests, setAdminTests] = useState<any[]>([]);
+  const [filteredTests, setFilteredTests] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedTest, setSelectedTest] = useState<any>(null);
   const [showPurchaseDialog, setShowPurchaseDialog] = useState(false);
-  const currentUser = userService.getCurrentUser();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [counts, setCounts] = useState({ free: 0, purchased: 0, total: 0 });
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const user = await userService.getCurrentUser();
+      setCurrentUser(user);
+    };
+    getCurrentUser();
+  }, []);
 
   // Load admin-created tests
   useEffect(() => {
-    const loadAdminTests = () => {
-      const modularTests = modularTestStorage.getAll();
+    const loadAdminTests = async () => {
+      const modularTests = await modularTestStorage.getAll();
       const convertedTests = modularTests
         .filter(test => test.status === 'Active')
         .map(test => convertModularTestForDisplay(test));
@@ -37,34 +46,68 @@ const BrowseTests = () => {
     loadAdminTests();
   }, []);
 
-  const getFilteredTests = () => {
-    let filtered = adminTests.filter(test => {
-      const subjectMatch = selectedSubject === 'all' || test.subject === selectedSubject;
-      const difficultyMatch = selectedDifficulty === 'all' || test.difficulty === selectedDifficulty;
-      const moduleMatch = selectedModule === 'all' || 
-                         test.moduleCount?.toString() === selectedModule;
+  // Update filtered tests when filters change
+  useEffect(() => {
+    const updateFilteredTests = async () => {
+      let filtered = adminTests.filter(test => {
+        const subjectMatch = selectedSubject === 'all' || test.subject === selectedSubject;
+        const difficultyMatch = selectedDifficulty === 'all' || test.difficulty === selectedDifficulty;
+        const moduleMatch = selectedModule === 'all' || 
+                           test.moduleCount?.toString() === selectedModule;
+        
+        return subjectMatch && difficultyMatch && moduleMatch;
+      });
+
+      // Add access information
+      if (currentUser) {
+        for (let test of filtered) {
+          test.hasAccess = await userPurchaseService.hasTestAccess(currentUser.id, test.id, test.plan);
+          test.isPurchased = test.plan !== 'Free' && test.hasAccess;
+        }
+      } else {
+        filtered = filtered.map(test => ({
+          ...test,
+          hasAccess: test.plan === 'Free',
+          isPurchased: false
+        }));
+      }
+
+      // Apply tab filter
+      if (activeTab === 'free') {
+        filtered = filtered.filter(test => test.plan === 'Free');
+      } else if (activeTab === 'purchased') {
+        filtered = filtered.filter(test => test.isPurchased);
+      }
+
+      setFilteredTests(filtered);
+    };
+
+    updateFilteredTests();
+  }, [adminTests, selectedSubject, selectedDifficulty, selectedModule, activeTab, currentUser]);
+
+  // Update counts when tests change
+  useEffect(() => {
+    const updateCounts = async () => {
+      const freeTests = adminTests.filter(test => test.plan === 'Free').length;
+      let purchasedTests = 0;
       
-      return subjectMatch && difficultyMatch && moduleMatch;
-    });
+      if (currentUser) {
+        for (let test of adminTests) {
+          if (test.plan !== 'Free' && await userPurchaseService.hasTestAccess(currentUser.id, test.id, test.plan)) {
+            purchasedTests++;
+          }
+        }
+      }
+      
+      setCounts({ 
+        free: freeTests, 
+        purchased: purchasedTests, 
+        total: adminTests.length 
+      });
+    };
 
-    // Add access information
-    filtered = filtered.map(test => ({
-      ...test,
-      hasAccess: currentUser ? userPurchaseService.hasTestAccess(currentUser.id, test.id, test.plan) : test.plan === 'Free',
-      isPurchased: currentUser ? (test.plan !== 'Free' && userPurchaseService.hasTestAccess(currentUser.id, test.id, test.plan)) : false
-    }));
-
-    // Apply tab filter
-    if (activeTab === 'free') {
-      filtered = filtered.filter(test => test.plan === 'Free');
-    } else if (activeTab === 'purchased') {
-      filtered = filtered.filter(test => test.isPurchased);
-    }
-
-    return filtered;
-  };
-
-  const filteredTests = getFilteredTests();
+    updateCounts();
+  }, [adminTests, currentUser]);
 
   const handleStartTest = (testId: string, hasAccess: boolean) => {
     if (!hasAccess) {
@@ -78,26 +121,13 @@ const BrowseTests = () => {
     setShowPurchaseDialog(true);
   };
 
-  const handlePurchaseComplete = () => {
-    const loadAdminTests = () => {
-      const modularTests = modularTestStorage.getAll();
-      const convertedTests = modularTests
-        .filter(test => test.status === 'Active')
-        .map(test => convertModularTestForDisplay(test));
-      setAdminTests(convertedTests);
-    };
-    loadAdminTests();
+  const handlePurchaseComplete = async () => {
+    const modularTests = await modularTestStorage.getAll();
+    const convertedTests = modularTests
+      .filter(test => test.status === 'Active')
+      .map(test => convertModularTestForDisplay(test));
+    setAdminTests(convertedTests);
   };
-
-  const getTestCounts = () => {
-    const freeTests = adminTests.filter(test => test.plan === 'Free').length;
-    const purchasedTests = adminTests.filter(test => 
-      currentUser ? userPurchaseService.hasTestAccess(currentUser.id, test.id, test.plan) && test.plan !== 'Free' : false
-    ).length;
-    return { free: freeTests, purchased: purchasedTests, total: adminTests.length };
-  };
-
-  const counts = getTestCounts();
 
   return (
     <div className="p-6 space-y-6">

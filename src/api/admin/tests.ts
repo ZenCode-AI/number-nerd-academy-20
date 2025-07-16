@@ -14,7 +14,7 @@ export const adminTestsAPI = {
     subject?: string;
   }): Promise<PaginatedResponse<Test | ModularTest>> {
     // Mock implementation using storage
-    const tests = modularTestStorage.getAll();
+    const tests = await modularTestStorage.getAll();
     const filteredTests = tests.filter(test => {
       if (params?.status && test.status !== params.status) return false;
       if (params?.subject && !test.modules.some(m => m.subject === params.subject)) return false;
@@ -35,7 +35,7 @@ export const adminTestsAPI = {
 
   // Create new test
   async createTest(testData: Omit<ModularTest, 'id' | 'createdAt'>): Promise<ApiResponse<ModularTest>> {
-    const newTest = modularTestStorage.create(testData);
+    const newTest = await modularTestStorage.create(testData);
     return {
       data: newTest,
       success: true,
@@ -45,7 +45,7 @@ export const adminTestsAPI = {
 
   // Update existing test
   async updateTest(id: string, testData: Partial<ModularTest>): Promise<ApiResponse<ModularTest>> {
-    const updatedTest = modularTestStorage.update(id, testData);
+    const updatedTest = await modularTestStorage.update(id, testData);
     return {
       data: updatedTest,
       success: true,

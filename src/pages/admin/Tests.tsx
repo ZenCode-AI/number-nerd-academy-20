@@ -31,9 +31,9 @@ const Tests = () => {
   const [tests, setTests] = useState<LocalTest[]>([]);
 
   // Load tests from storage
-  const loadTests = () => {
+  const loadTests = async () => {
     // Load modular tests from storage (no sample tests)
-    const modularTests = modularTestStorage.getAll();
+    const modularTests = await modularTestStorage.getAll();
     const convertedModularTests = modularTests.map(convertModularTestForDisplay);
 
     setTests(convertedModularTests);
@@ -116,10 +116,10 @@ const Tests = () => {
     }
   };
 
-  const handleToggleStatus = (testId: number) => {
+  const handleToggleStatus = async (testId: number) => {
     try {
       const testIdString = testId.toString();
-      const modularTest = modularTestStorage.getById(testIdString);
+      const modularTest = await modularTestStorage.getById(testIdString);
       
       if (modularTest) {
         // Update the status in storage

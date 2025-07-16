@@ -17,8 +17,8 @@ const TestSets = () => {
 
   // Load test sets from localStorage
   useEffect(() => {
-    const loadTestSets = () => {
-      const storedTestSets = testSetStorage.getAllTestSets();
+    const loadTestSets = async () => {
+      const storedTestSets = await testSetStorage.getAllTestSets();
       // Add mock data if no test sets exist
       if (storedTestSets.length === 0) {
         const mockTestSet: TestSet = {
@@ -92,10 +92,11 @@ const TestSets = () => {
     testSet.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSaveTestSet = (testSet: TestSet) => {
+  const handleSaveTestSet = async (testSet: TestSet) => {
     try {
-      testSetStorage.saveTestSet(testSet);
-      setTestSets(testSetStorage.getAllTestSets());
+      await testSetStorage.saveTestSet(testSet);
+      const updatedTestSets = await testSetStorage.getAllTestSets();
+      setTestSets(updatedTestSets);
       
       if (editingTestSet) {
         toast({
@@ -124,11 +125,12 @@ const TestSets = () => {
     setShowBuilder(true);
   };
 
-  const handleDeleteTestSet = (testSetId: string) => {
+  const handleDeleteTestSet = async (testSetId: string) => {
     try {
       const testSet = testSets.find(ts => ts.id === testSetId);
-      testSetStorage.deleteTestSet(testSetId);
-      setTestSets(testSetStorage.getAllTestSets());
+      await testSetStorage.deleteTestSet(testSetId);
+      const updatedTestSets = await testSetStorage.getAllTestSets();
+      setTestSets(updatedTestSets);
       
       if (testSet) {
         toast({

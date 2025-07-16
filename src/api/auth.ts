@@ -46,6 +46,10 @@ export const authAPI = {
       throw new Error(error.message);
     }
 
-    return data as AuthUser;
+    return { 
+      ...data, 
+      isAuthenticated: true,
+      preferences: data.preferences as any || { notifications: true, theme: 'light', language: 'en' }
+    } as AuthUser;
   },
 };

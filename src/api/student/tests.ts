@@ -15,7 +15,7 @@ export interface TestAccess {
 export const studentTestsAPI = {
   // Get available tests for student
   async getAvailableTests(userId: string): Promise<ApiResponse<any[]>> {
-    const modularTests = modularTestStorage.getAll();
+    const modularTests = await modularTestStorage.getAll();
     const activeTests = modularTests.filter(test => test.status === 'Active');
     const convertedTests = activeTests.map(test => {
       const displayTest = convertModularTestForDisplay(test);
@@ -34,7 +34,7 @@ export const studentTestsAPI = {
 
   // Get purchased tests for student
   async getPurchasedTests(userId: string): Promise<ApiResponse<any[]>> {
-    const modularTests = modularTestStorage.getAll();
+    const modularTests = await modularTestStorage.getAll();
     const activeTests = modularTests.filter(test => test.status === 'Active');
     const purchasedTests = activeTests
       .map(test => convertModularTestForDisplay(test))
@@ -51,7 +51,7 @@ export const studentTestsAPI = {
 
   // Get test details
   async getTestDetails(testId: string): Promise<ApiResponse<ModularTest>> {
-    const test = modularTestStorage.getById(testId);
+    const test = await modularTestStorage.getById(testId);
     if (!test) {
       throw new Error('Test not found');
     }
@@ -64,12 +64,12 @@ export const studentTestsAPI = {
 
   // Check test access
   async checkTestAccess(userId: string, testId: string): Promise<ApiResponse<TestAccess>> {
-    const test = modularTestStorage.getById(testId);
+    const test = await modularTestStorage.getById(testId);
     if (!test) {
       throw new Error('Test not found');
     }
 
-    const hasAccess = userPurchaseService.hasTestAccess(userId, testId, test.plan);
+    const hasAccess = await userPurchaseService.hasTestAccess(userId, testId, test.plan);
     
     return {
       data: {
