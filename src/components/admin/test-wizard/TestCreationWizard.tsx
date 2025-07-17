@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, ArrowRight, Check, AlertCircle, Save, RefreshCw } from 'lucide-react';
 import { ModularTest, TestModule } from '@/types/modularTest';
 import TestDetailsStep from './TestDetailsStep';
 import ModuleConfigurationStep from './ModuleConfigurationStep';
@@ -12,6 +13,9 @@ import EnhancedWizardNavigation from './EnhancedWizardNavigation';
 import ScoreDashboard from './ScoreDashboard';
 import { useWizardNavigation } from './wizard-logic/useWizardNavigation';
 import { useTestCreation } from './wizard-logic/useTestCreation';
+import { useTestValidation } from '@/hooks/useTestValidation';
+import { useTestAutoSave } from '@/hooks/useTestAutoSave';
+import { useToast } from '@/hooks/use-toast';
 
 const TestCreationWizard = () => {
   const [currentModuleIndex, setCurrentModuleIndex] = useState(0);
@@ -28,6 +32,10 @@ const TestCreationWizard = () => {
     adaptiveRules: []
   });
 
+  const { toast } = useToast();
+  const { validationErrors, validateStep, getFieldError, hasErrors, hasWarnings } = useTestValidation();
+  const { isSaving, lastSaved, debouncedSave, loadFromLocal, clearLocalSave, hasLocalSave } = useTestAutoSave();
+
   const {
     currentStep,
     setCurrentStep,
@@ -36,6 +44,21 @@ const TestCreationWizard = () => {
   } = useWizardNavigation(testData);
 
   const { handleCreateTest, resetWizard } = useTestCreation();
+
+  // Load auto-saved data on mount
+  useEffect(() => {
+    if (hasLocalSave()) {
+      const savedData = loadFromLocal();
+      if (savedData) {
+        toast({
+          title: "Restored from auto-save",
+          description: "Your previous work has been restored.",
+          duration: 4000,
+        });
+        setTestData(savedData);
+      }
+    }
+  }, [hasLocalSave, loadFromLocal, toast]);
 
   // Build steps dynamically based on adaptive setting
   const steps = [
@@ -47,24 +70,49 @@ const TestCreationWizard = () => {
   ];
 
   const updateTestData = (updates: Partial<ModularTest>) => {
-    setTestData(prev => ({ ...prev, ...updates }));
+    const newData = { ...testData, ...updates };
+    setTestData(newData);
+    
+    // Auto-save after changes
+    debouncedSave(newData);
   };
 
   const updateModule = (moduleIndex: number, updates: Partial<TestModule>) => {
     const updatedModules = [...(testData.modules || [])];
     updatedModules[moduleIndex] = { ...updatedModules[moduleIndex], ...updates };
-    setTestData(prev => ({ ...prev, modules: updatedModules }));
+    updateTestData({ modules: updatedModules });
+  };
+
+  const handleNextWithValidation = () => {
+    const isValid = validateStep(testData, currentStep);
+    if (isValid || !hasErrors) {
+      handleNext();
+    }
   };
 
   const handleCreateAndReset = async () => {
+    const isValid = validateStep(testData, 'review');
+    if (!isValid && hasErrors) {
+      toast({
+        title: "Validation Failed",
+        description: "Please fix all errors before creating the test.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     await handleCreateTest(testData);
+    
+    // Clear auto-save after successful creation
+    clearLocalSave();
+    
     setTestData({
       name: '',
       description: '',
       modules: [],
       totalDuration: 60,
       totalScore: 0,
-      breakDuration: 300, // Default 5 minutes break
+      breakDuration: 300,
       plan: 'Basic' as const,
       status: 'Draft' as const,
       isAdaptive: false,
@@ -101,6 +149,25 @@ const TestCreationWizard = () => {
 
       <EnhancedWizardNavigation steps={steps} currentStep={currentStep} onStepClick={setCurrentStep} />
 
+      {/* Validation Alerts */}
+      {hasErrors && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Please fix the following errors: {validationErrors.filter(e => e.severity === 'error').map(e => e.message).join(', ')}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {hasWarnings && !hasErrors && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Warnings: {validationErrors.filter(e => e.severity === 'warning').map(e => e.message).join(', ')}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Main Content - Horizontal Layout */}
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-8">
@@ -113,6 +180,32 @@ const TestCreationWizard = () => {
 
         <div className="col-span-12 lg:col-span-4">
           <ScoreDashboard modules={testData.modules || []} targetScore={testData.totalScore} />
+          
+          {/* Auto-save status */}
+          <Card className="mt-4">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Auto-save</span>
+                <div className="flex items-center gap-2">
+                  {isSaving ? (
+                    <>
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span className="text-blue-600">Saving...</span>
+                    </>
+                  ) : lastSaved ? (
+                    <>
+                      <Save className="h-3 w-3 text-green-600" />
+                      <span className="text-green-600">
+                        Saved {lastSaved.toLocaleTimeString()}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-gray-400">Not saved</span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -133,7 +226,11 @@ const TestCreationWizard = () => {
             Create Test
           </Button>
         ) : (
-          <Button onClick={handleNext} className="flex items-center gap-2">
+          <Button 
+            onClick={handleNextWithValidation}
+            disabled={hasErrors}
+            className="flex items-center gap-2"
+          >
             Next
             <ArrowRight className="h-4 w-4" />
           </Button>
