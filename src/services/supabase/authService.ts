@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, AuthError } from '@supabase/supabase-js';
+import { logAuthError, retryWithBackoff } from '@/utils/authErrorHandler';
 
 export interface AuthUser {
   id: string;
@@ -23,32 +24,60 @@ export interface AuthUser {
 export const authService = {
   // Sign up with email and password
   async signUp(email: string, password: string, name?: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          name: name || email.split('@')[0]
-        }
-      }
-    });
-    return { data, error };
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const result = await retryWithBackoff(async () => {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: name ? { name } : undefined
+          }
+        });
+
+        if (error) throw error;
+        return { data, error: null };
+      });
+
+      return result;
+    } catch (error) {
+      logAuthError(error, 'SIGN_UP', email);
+      return { data: null, error: error as AuthError };
+    }
   },
 
   // Sign in with email and password
   async signIn(email: string, password: string) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    return { data, error };
+    try {
+      const result = await retryWithBackoff(async () => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+        return { data, error: null };
+      });
+
+      return result;
+    } catch (error) {
+      logAuthError(error, 'SIGN_IN', email);
+      return { data: null, error: error as AuthError };
+    }
   },
 
   // Sign out
   async signOut() {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      logAuthError(error, 'SIGN_OUT');
+      return { error: error as AuthError };
+    }
   },
 
   // Get current session
@@ -96,25 +125,37 @@ export const authService = {
 
   // Update user profile
   async updateProfile(updates: Partial<AuthUser>) {
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session?.user) {
-      throw new Error('User not authenticated');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Validate updates before applying
+      const validatedUpdates: any = {};
+      if (updates.name !== undefined) validatedUpdates.name = updates.name;
+      if (updates.phone !== undefined) validatedUpdates.phone = updates.phone;
+      if (updates.avatar !== undefined) validatedUpdates.avatar_url = updates.avatar;
+      if (updates.preferences !== undefined) validatedUpdates.preferences = updates.preferences;
+
+      const result = await retryWithBackoff(async () => {
+        const { data, error } = await supabase
+          .from('users')
+          .update(validatedUpdates)
+          .eq('id', user.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { data, error: null };
+      });
+
+      return result;
+    } catch (error) {
+      logAuthError(error, 'UPDATE_PROFILE', updates.email);
+      return { data: null, error: error as any };
     }
-
-    const { data, error } = await supabase
-      .from('users')
-      .update({
-        name: updates.name,
-        avatar_url: updates.avatar,
-        phone: updates.phone,
-        preferences: updates.preferences
-      })
-      .eq('id', session.user.id)
-      .select()
-      .single();
-
-    return { data, error };
   },
 
   // Convert Supabase user to AuthUser

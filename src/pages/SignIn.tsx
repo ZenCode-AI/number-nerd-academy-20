@@ -3,14 +3,21 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { authService } from '@/services/supabase/authService';
+import { emailService } from '@/services/supabase/emailService';
+import { mapAuthError } from '@/utils/authErrorHandler';
+import { Loader2, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 const SignIn = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -35,10 +42,14 @@ const SignIn = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+    setNeedsEmailVerification(false);
 
     try {
       if (isSignUp) {
         if (formData.password !== formData.confirmPassword) {
+          setError("Passwords do not match.");
           toast({
             title: "Password Mismatch",
             description: "Passwords do not match.",
@@ -47,29 +58,50 @@ const SignIn = () => {
           return;
         }
         
-        const { error } = await authService.signUp(formData.email, formData.password, formData.name);
+        const { data, error } = await authService.signUp(formData.email, formData.password, formData.name);
+        
         if (error) {
+          const errorInfo = mapAuthError(error);
+          setError(errorInfo.message);
           toast({
-            title: "Sign Up Failed",
-            description: error.message,
             variant: "destructive",
+            title: errorInfo.title,
+            description: errorInfo.message,
           });
           return;
         }
-        
-        toast({
-          title: "Account Created",
-          description: "Please check your email to verify your account, then sign in.",
-        });
-        setIsSignUp(false);
+
+        if (data.user && !data.session) {
+          setNeedsEmailVerification(true);
+          setSuccess("Account created! Please check your email to verify your account before signing in.");
+          toast({
+            title: "Check your email",
+            description: "We've sent you a confirmation link. Please check your email to verify your account.",
+          });
+        } else {
+          setSuccess("Account created successfully! You are now signed in.");
+          toast({
+            title: "Account created successfully!",
+            description: "Welcome to NNA. You can now browse and take tests.",
+          });
+          
+          // Redirect admin users to admin dashboard
+          if (formData.email.includes('admin')) {
+            navigate('/admin');
+          } else {
+            navigate(from, { replace: true });
+          }
+        }
       } else {
         await login(formData.email, formData.password);
+        
+        setSuccess("Successfully signed in!");
         toast({
-          title: "Welcome!",
-          description: "You have been signed in successfully.",
+          title: "Signed in successfully!",
+          description: "Welcome back to NNA.",
         });
         
-        // Redirect based on user role or intended destination
+        // Redirect admin users to admin dashboard
         if (formData.email.includes('admin')) {
           navigate('/admin');
         } else if (from !== '/') {
@@ -78,11 +110,86 @@ const SignIn = () => {
           navigate('/student');
         }
       }
+    } catch (error: any) {
+      const errorInfo = mapAuthError(error);
+      setError(errorInfo.message);
+      
+      // Check if it's an email verification issue
+      if (error.message === 'Email not confirmed') {
+        setNeedsEmailVerification(true);
+      }
+      
+      toast({
+        variant: "destructive",
+        title: errorInfo.title,
+        description: errorInfo.message,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setIsLoading(true);
+    try {
+      const { error } = await emailService.resendConfirmation(formData.email);
+      
+      if (error) {
+        const errorInfo = mapAuthError(error);
+        toast({
+          variant: "destructive",
+          title: errorInfo.title,
+          description: errorInfo.message,
+        });
+      } else {
+        toast({
+          title: "Verification email sent",
+          description: "Please check your email for the verification link.",
+        });
+      }
     } catch (error) {
       toast({
-        title: "Authentication Failed",
-        description: "Please check your credentials and try again.",
         variant: "destructive",
+        title: "Failed to send verification email",
+        description: "Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      toast({
+        variant: "destructive",
+        title: "Email required",
+        description: "Please enter your email address first.",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await emailService.resetPassword(formData.email);
+      
+      if (error) {
+        const errorInfo = mapAuthError(error);
+        toast({
+          variant: "destructive",
+          title: errorInfo.title,
+          description: errorInfo.message,
+        });
+      } else {
+        toast({
+          title: "Password reset email sent",
+          description: "Please check your email for password reset instructions.",
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to send reset email",
+        description: "Please try again later.",
       });
     } finally {
       setIsLoading(false);
@@ -115,6 +222,37 @@ const SignIn = () => {
             </p>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            
+            {success && (
+              <Alert className="mb-4">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+            
+            {needsEmailVerification && (
+              <Alert className="mb-4">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  Need help? 
+                  <Button 
+                    variant="link" 
+                    className="p-0 ml-1 h-auto font-normal"
+                    onClick={handleResendVerification}
+                    disabled={isLoading}
+                  >
+                    Resend verification email
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
               {isSignUp && (
                 <div>
@@ -197,11 +335,26 @@ const SignIn = () => {
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <LoadingSpinner size="sm" />
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Please wait...
+                  </>
                 ) : (
                   isSignUp ? 'Create Account' : 'Sign In'
                 )}
               </Button>
+              
+              {!isSignUp && (
+                <Button 
+                  type="button" 
+                  variant="link" 
+                  className="w-full"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading}
+                >
+                  Forgot password?
+                </Button>
+              )}
             </form>
             
             <div className="mt-6 text-center">
