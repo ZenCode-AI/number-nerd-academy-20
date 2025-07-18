@@ -86,15 +86,13 @@ export const useSupabaseAuth = () => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await authService.signIn(email, password);
-    if (error) throw error;
-    return data;
+    const result = await authService.signIn(email, password);
+    return result;
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
-    const { data, error } = await authService.signUp(email, password, name);
-    if (error) throw error;
-    return data;
+    const result = await authService.signUp(email, password, name);
+    return result;
   };
 
   const signOut = async () => {

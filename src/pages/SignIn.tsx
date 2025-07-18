@@ -58,39 +58,14 @@ const SignIn = () => {
           return;
         }
         
-        const { data, error } = await authService.signUp(formData.email, formData.password, formData.name);
+        const result = await authService.signUp(formData.email, formData.password, formData.name);
         
-        if (error) {
-          const errorInfo = mapAuthError(error);
-          setError(errorInfo.message);
+        if (result?.user) {
           toast({
-            variant: "destructive",
-            title: errorInfo.title,
-            description: errorInfo.message,
+            title: "Success",
+            description: "Account created successfully! Please check your email to verify your account.",
           });
-          return;
-        }
-
-        if (data.user && !data.session) {
-          setNeedsEmailVerification(true);
-          setSuccess("Account created! Please check your email to verify your account before signing in.");
-          toast({
-            title: "Check your email",
-            description: "We've sent you a confirmation link. Please check your email to verify your account.",
-          });
-        } else {
-          setSuccess("Account created successfully! You are now signed in.");
-          toast({
-            title: "Account created successfully!",
-            description: "Welcome to NNA. You can now browse and take tests.",
-          });
-          
-          // Redirect admin users to admin dashboard
-          if (formData.email.includes('admin')) {
-            navigate('/admin');
-          } else {
-            navigate(from, { replace: true });
-          }
+          setIsSignUp(false);
         }
       } else {
         await login(formData.email, formData.password);
