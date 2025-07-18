@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ArrowLeft, ArrowRight, Check, AlertCircle, Save, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, AlertCircle } from 'lucide-react';
 import { ModularTest, TestModule } from '@/types/modularTest';
 import TestDetailsStep from './TestDetailsStep';
 import ModuleConfigurationStep from './ModuleConfigurationStep';
@@ -14,7 +14,7 @@ import ScoreDashboard from './ScoreDashboard';
 import { useWizardNavigation } from './wizard-logic/useWizardNavigation';
 import { useTestCreation } from './wizard-logic/useTestCreation';
 import { useTestValidation } from '@/hooks/useTestValidation';
-import { useTestAutoSave } from '@/hooks/useTestAutoSave';
+
 import { useToast } from '@/hooks/use-toast';
 
 const TestCreationWizard = () => {
@@ -34,7 +34,7 @@ const TestCreationWizard = () => {
 
   const { toast } = useToast();
   const { validationErrors, validateStep, getFieldError, hasErrors, hasWarnings } = useTestValidation();
-  const { isSaving, lastSaved, debouncedSave, loadFromLocal, clearLocalSave, hasLocalSave } = useTestAutoSave();
+  
 
   const {
     currentStep,
@@ -45,20 +45,6 @@ const TestCreationWizard = () => {
 
   const { handleCreateTest, resetWizard } = useTestCreation();
 
-  // Load auto-saved data on mount
-  useEffect(() => {
-    if (hasLocalSave()) {
-      const savedData = loadFromLocal();
-      if (savedData) {
-        toast({
-          title: "Restored from auto-save",
-          description: "Your previous work has been restored.",
-          duration: 4000,
-        });
-        setTestData(savedData);
-      }
-    }
-  }, [hasLocalSave, loadFromLocal, toast]);
 
   // Build steps dynamically based on adaptive setting
   const steps = [
@@ -72,9 +58,6 @@ const TestCreationWizard = () => {
   const updateTestData = (updates: Partial<ModularTest>) => {
     const newData = { ...testData, ...updates };
     setTestData(newData);
-    
-    // Auto-save after changes
-    debouncedSave(newData);
   };
 
   const updateModule = (moduleIndex: number, updates: Partial<TestModule>) => {
@@ -102,9 +85,6 @@ const TestCreationWizard = () => {
     }
 
     await handleCreateTest(testData);
-    
-    // Clear auto-save after successful creation
-    clearLocalSave();
     
     setTestData({
       name: '',
@@ -180,32 +160,6 @@ const TestCreationWizard = () => {
 
         <div className="col-span-12 lg:col-span-4">
           <ScoreDashboard modules={testData.modules || []} targetScore={testData.totalScore} />
-          
-          {/* Auto-save status */}
-          <Card className="mt-4">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Auto-save</span>
-                <div className="flex items-center gap-2">
-                  {isSaving ? (
-                    <>
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      <span className="text-blue-600">Saving...</span>
-                    </>
-                  ) : lastSaved ? (
-                    <>
-                      <Save className="h-3 w-3 text-green-600" />
-                      <span className="text-green-600">
-                        Saved {lastSaved.toLocaleTimeString()}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-gray-400">Not saved</span>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 

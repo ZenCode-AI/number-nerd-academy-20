@@ -9,7 +9,6 @@ export interface TestSession {
   answers: TestAnswer[];
   flaggedQuestions: Set<number>;
   isSubmitted: boolean;
-  autoSaveEnabled: boolean;
 }
 
 export interface TestAnswer {

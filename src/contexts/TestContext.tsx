@@ -74,8 +74,7 @@ const testReducer = (state: TestState, action: TestAction): TestState => {
           currentQuestionIndex: 0,
           answers: [],
           flaggedQuestions: new Set(),
-          isSubmitted: false,
-          autoSaveEnabled: true
+          isSubmitted: false
         }
       };
     
