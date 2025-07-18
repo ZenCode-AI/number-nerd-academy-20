@@ -14,7 +14,7 @@ import { useTestAnswerManager } from './hooks/useTestAnswerManager';
 
 const TestSetModuleInterface = () => {
   const { currentModuleData, session, testSet, moduleResults } = useTestSet();
-  const timeRemaining = useTestTimer();
+  const { timeRemaining } = useTestTimer();
   const { answers, handleAnswerSubmit } = useTestAnswerManager();
   
   const {
