@@ -1,5 +1,13 @@
+// Authentication error handling
 import { AuthError } from '@supabase/supabase-js';
-import { logError } from './errorHandling';
+import { ErrorReporter, createError } from './errorHandling';
+
+export interface AuthErrorDetails {
+  code: string;
+  message: string;
+  shouldRedirect?: boolean;
+  retryable?: boolean;
+}
 
 export interface AuthErrorInfo {
   message: string;
@@ -8,6 +16,118 @@ export interface AuthErrorInfo {
   severity: 'error' | 'warning' | 'info';
 }
 
+export class AuthErrorHandler {
+  static handle(error: AuthError | Error | any): AuthErrorDetails {
+    const errorDetails = this.mapError(error);
+    
+    // Report to global error handler
+    ErrorReporter.report(createError(
+      errorDetails.code,
+      errorDetails.message,
+      error,
+      'AUTH'
+    ));
+    
+    return errorDetails;
+  }
+  
+  private static mapError(error: any): AuthErrorDetails {
+    const message = error?.message || 'Unknown authentication error';
+    
+    // Supabase specific errors
+    if (error?.code) {
+      switch (error.code) {
+        case 'invalid_credentials':
+          return {
+            code: 'INVALID_CREDENTIALS',
+            message: 'Invalid email or password. Please check your credentials.',
+            retryable: true,
+          };
+          
+        case 'email_not_confirmed':
+          return {
+            code: 'EMAIL_NOT_CONFIRMED',
+            message: 'Please check your email and click the confirmation link.',
+            retryable: false,
+          };
+          
+        case 'too_many_requests':
+          return {
+            code: 'RATE_LIMIT',
+            message: 'Too many login attempts. Please wait a few minutes and try again.',
+            retryable: true,
+          };
+          
+        case 'signup_disabled':
+          return {
+            code: 'SIGNUP_DISABLED',
+            message: 'New registrations are currently disabled.',
+            retryable: false,
+          };
+          
+        case 'email_address_invalid':
+          return {
+            code: 'INVALID_EMAIL',
+            message: 'Please enter a valid email address.',
+            retryable: true,
+          };
+          
+        case 'password_too_short':
+          return {
+            code: 'WEAK_PASSWORD',
+            message: 'Password must be at least 6 characters long.',
+            retryable: true,
+          };
+      }
+    }
+    
+    // Session and token errors
+    if (message.includes('session') || message.includes('token')) {
+      return {
+        code: 'SESSION_EXPIRED',
+        message: 'Your session has expired. Please sign in again.',
+        shouldRedirect: true,
+        retryable: false,
+      };
+    }
+    
+    // Network errors
+    if (message.includes('network') || message.includes('fetch')) {
+      return {
+        code: 'NETWORK_ERROR',
+        message: 'Connection failed. Please check your internet and try again.',
+        retryable: true,
+      };
+    }
+    
+    // Permission errors
+    if (message.includes('permission') || message.includes('unauthorized')) {
+      return {
+        code: 'PERMISSION_ERROR',
+        message: 'You don\'t have permission to access this resource.',
+        shouldRedirect: true,
+        retryable: false,
+      };
+    }
+    
+    // Default error
+    return {
+      code: 'AUTH_ERROR',
+      message: 'Authentication failed. Please try again.',
+      retryable: true,
+    };
+  }
+  
+  static shouldRetry(errorDetails: AuthErrorDetails): boolean {
+    return errorDetails.retryable === true;
+  }
+  
+  static shouldRedirect(errorDetails: AuthErrorDetails): boolean {
+    return errorDetails.shouldRedirect === true;
+  }
+}
+
+// Legacy functions for backward compatibility
 export const mapAuthError = (error: AuthError | Error | unknown): AuthErrorInfo => {
   if (error instanceof AuthError) {
     switch (error.message) {
@@ -116,9 +236,6 @@ export const logAuthError = (error: unknown, context: string, userId?: string): 
   const errorInfo = mapAuthError(error);
   const logContext = `AUTH_${context}${userId ? `_USER_${userId}` : ''}`;
   
-  logError(error, logContext);
-  
-  // Log additional context for auth errors
   console.error(`[${logContext}] Auth Error Details:`, {
     title: errorInfo.title,
     message: errorInfo.message,

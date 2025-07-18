@@ -7,6 +7,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { useGlobalErrorHandler } from "@/hooks/useGlobalErrorHandler";
+import { ConnectionStatus } from "@/components/common/ConnectionStatus";
 import Index from "./pages/Index";
 import SignIn from "./pages/SignIn";
 import NotFound from "./pages/NotFound";
@@ -29,6 +31,84 @@ import MultiModuleReview from "./pages/student/test/MultiModuleReview";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  // Initialize global error handling
+  useGlobalErrorHandler();
+  
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/signin" element={<SignIn />} />
+        
+        {/* Student Routes */}
+        <Route path="/student" element={
+          <ProtectedRoute requiredRole="student">
+            <StudentLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<StudentDashboard />} />
+          <Route path="browse" element={<MyTests />} />
+          <Route path="profile" element={<StudentProfilePage />} />
+        </Route>
+
+        {/* Test Taking Routes */}
+        <Route path="/student/test/:testId" element={
+          <ProtectedRoute requiredRole="student">
+            <TestTakingPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/student/test/:testId/results" element={
+          <ProtectedRoute requiredRole="student">
+            <TestResults />
+          </ProtectedRoute>
+        } />
+        <Route path="/student/test/:testId/review" element={
+          <ProtectedRoute requiredRole="student">
+            <TestReview />
+          </ProtectedRoute>
+        } />
+        {/* Fallback route for test results without testId */}
+        <Route path="/student/test/results" element={
+          <ProtectedRoute requiredRole="student">
+            <TestResults />
+          </ProtectedRoute>
+        } />
+        {/* Fallback route for test review without testId */}
+        <Route path="/student/test/review" element={
+          <ProtectedRoute requiredRole="student">
+            <TestReview />
+          </ProtectedRoute>
+        } />
+        {/* Multi-module test review route */}
+        <Route path="/student/test/:testId/multi-module-review" element={
+          <ProtectedRoute requiredRole="student">
+            <MultiModuleReview />
+          </ProtectedRoute>
+        } />
+        
+        {/* Admin Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<Dashboard />} />
+          <Route path="users" element={<Users />} />
+          <Route path="tests" element={<Tests />} />
+          <Route path="create-test" element={<CreateTest />} />
+          <Route path="edit-test/:testId" element={<EditTest />} />
+          <Route path="edit-test-wizard/:testId" element={<EditTestWizard />} />
+          <Route path="profile" element={<AdminProfilePage />} />
+        </Route>
+        
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <ConnectionStatus />
+    </>
+  );
+};
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -37,73 +117,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/signin" element={<SignIn />} />
-              
-              {/* Student Routes */}
-              <Route path="/student" element={
-                <ProtectedRoute requiredRole="student">
-                  <StudentLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<StudentDashboard />} />
-                <Route path="browse" element={<MyTests />} />
-                <Route path="profile" element={<StudentProfilePage />} />
-              </Route>
-
-              {/* Test Taking Routes */}
-              <Route path="/student/test/:testId" element={
-                <ProtectedRoute requiredRole="student">
-                  <TestTakingPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/student/test/:testId/results" element={
-                <ProtectedRoute requiredRole="student">
-                  <TestResults />
-                </ProtectedRoute>
-              } />
-              <Route path="/student/test/:testId/review" element={
-                <ProtectedRoute requiredRole="student">
-                  <TestReview />
-                </ProtectedRoute>
-              } />
-              {/* Fallback route for test results without testId */}
-              <Route path="/student/test/results" element={
-                <ProtectedRoute requiredRole="student">
-                  <TestResults />
-                </ProtectedRoute>
-              } />
-              {/* Fallback route for test review without testId */}
-              <Route path="/student/test/review" element={
-                <ProtectedRoute requiredRole="student">
-                  <TestReview />
-                </ProtectedRoute>
-               } />
-               {/* Multi-module test review route */}
-               <Route path="/student/test/:testId/multi-module-review" element={
-                 <ProtectedRoute requiredRole="student">
-                   <MultiModuleReview />
-                 </ProtectedRoute>
-               } />
-              
-              {/* Admin Routes */}
-              <Route path="/admin" element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminLayout />
-                </ProtectedRoute>
-              }>
-                <Route index element={<Dashboard />} />
-                <Route path="users" element={<Users />} />
-                <Route path="tests" element={<Tests />} />
-                <Route path="create-test" element={<CreateTest />} />
-                <Route path="edit-test/:testId" element={<EditTest />} />
-                <Route path="edit-test-wizard/:testId" element={<EditTestWizard />} />
-                <Route path="profile" element={<AdminProfilePage />} />
-              </Route>
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppContent />
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

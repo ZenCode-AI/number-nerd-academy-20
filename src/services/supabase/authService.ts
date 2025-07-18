@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { logAuthError, retryWithBackoff } from '@/utils/authErrorHandler';
+import { ApiInterceptor } from '@/services/apiInterceptor';
+import { AuthErrorHandler, logAuthError, retryWithBackoff } from '@/utils/authErrorHandler';
 
 export interface AuthUser {
   id: string;
@@ -27,44 +28,33 @@ export const authService = {
     try {
       const redirectUrl = `${window.location.origin}/`;
       
-      const result = await retryWithBackoff(async () => {
-        const { data, error } = await supabase.auth.signUp({
+      return await ApiInterceptor.handleSupabaseOperation(
+        () => supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: redirectUrl,
             data: name ? { name } : undefined
           }
-        });
-
-        if (error) throw error;
-        return { data, error: null };
-      });
-
-      return result;
+        }),
+        'AUTH_SIGNUP'
+      );
     } catch (error) {
-      logAuthError(error, 'SIGN_UP', email);
-      return { data: null, error: error as AuthError };
+      const authError = AuthErrorHandler.handle(error);
+      throw new Error(authError.message);
     }
   },
 
   // Sign in with email and password
   async signIn(email: string, password: string) {
     try {
-      const result = await retryWithBackoff(async () => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-        return { data, error: null };
-      });
-
-      return result;
+      return await ApiInterceptor.handleSupabaseOperation(
+        () => supabase.auth.signInWithPassword({ email, password }),
+        'AUTH_SIGNIN'
+      );
     } catch (error) {
-      logAuthError(error, 'SIGN_IN', email);
-      return { data: null, error: error as AuthError };
+      const authError = AuthErrorHandler.handle(error);
+      throw new Error(authError.message);
     }
   },
 
