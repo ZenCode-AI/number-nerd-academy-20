@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { authService } from '@/services/supabase/authService';
 import { emailService } from '@/services/supabase/emailService';
 import { mapAuthError } from '@/utils/authErrorHandler';
@@ -68,7 +67,10 @@ const SignIn = () => {
           setIsSignUp(false);
         }
       } else {
-        await login(formData.email, formData.password);
+        const result = await login(formData.email, formData.password);
+        
+        // Get user role from the authenticated user
+        const currentUser = await authService.getCurrentUser();
         
         setSuccess("Successfully signed in!");
         toast({
@@ -76,8 +78,8 @@ const SignIn = () => {
           description: "Welcome back to NNA.",
         });
         
-        // Redirect admin users to admin dashboard
-        if (formData.email.includes('admin')) {
+        // Redirect based on actual user role from database
+        if (currentUser?.role === 'admin') {
           navigate('/admin');
         } else if (from !== '/') {
           navigate(from);
@@ -263,9 +265,6 @@ const SignIn = () => {
                   required
                   disabled={isLoading}
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Use admin@example.com for admin access or student@example.com for student access
-                </p>
               </div>
               
               <div>
@@ -343,17 +342,6 @@ const SignIn = () => {
                   {isSignUp ? 'Sign In' : 'Sign Up'}
                 </button>
               </p>
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <Button
-                variant="outline"
-                className="w-full border-gray-300 text-gray-700 hover:bg-gray-50 font-semibold py-3 rounded-lg transition-all duration-200"
-                onClick={() => navigate('/')}
-                disabled={isLoading}
-              >
-                Continue as Guest
-              </Button>
             </div>
           </CardContent>
         </Card>
